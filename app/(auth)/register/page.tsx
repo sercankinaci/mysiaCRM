@@ -26,12 +26,6 @@ export default function RegisterPage() {
             const { data, error: signUpError } = await supabase.auth.signUp({
                 email,
                 password,
-                options: {
-                    data: {
-                        full_name: fullName,
-                        phone: phone,
-                    },
-                },
             })
 
             if (signUpError) throw signUpError

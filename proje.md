@@ -454,8 +454,4 @@ Bu dosyayı direkt:
 
 ekleyebilirsin.
 
----
-
-İstersen bunu **PDF**, **Notion Template** veya **README dosyası** formatında da hazırlayabilirim.
-Hazırlayayım mı?
-s
+v
