@@ -1,6 +1,8 @@
 # Proje Kuralları
 
 1. **Dil**: Proje boyunca tüm iletişim ve cevaplar **Türkçe** olacaktır.
+2. **Veritabanı Şeması**: Projede **KESİNLİKLE** `mysiacrm` şeması kullanılacaktır. `public` şeması **KULLANILMAYACAKTIR**. Tüm tablolar, fonksiyonlar ve diğer veritabanı nesneleri `mysiacrm` şeması altında oluşturulmalıdır.
+
 Elbette!
 Aşağıda **projenin tamamını kapsayan — tek parça, düzenli, kapsamlı ve IDE’ye direkt aktarılabilir** tam bir **Markdown proje planlama dosyası** hazırladım.
 

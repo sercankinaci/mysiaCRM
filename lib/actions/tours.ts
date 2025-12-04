@@ -3,7 +3,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { Database } from '@/types/supabase' // Eğer types/supabase.ts yoksa any kullanacağız veya oluşturacağız
 
 // Tur Tipi Tanımları (Veritabanı şemasına uygun)
 export type Tour = {
@@ -34,6 +33,28 @@ export type CreateTourData = {
 export async function getTours(query?: string, status?: string) {
     const supabase = await createClient()
 
+    // Kullanıcı kontrolü
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+        console.error('Kullanıcı doğrulanamadı:', authError)
+        return [] // Giriş yapmamış kullanıcı için boş array döndür
+    }
+
+    // Kullanıcının profil kaydı var mı kontrol et
+    const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, role')
+        .eq('id', user.id)
+        .single()
+
+    if (profileError || !profile) {
+        console.error('Profil bulunamadı:', profileError, 'User ID:', user.id)
+        throw new Error('Kullanıcı profili bulunamadı. Lütfen yöneticinize başvurun.')
+    }
+
+    console.log('Kullanıcı bilgisi:', { id: user.id, role: profile.role })
+
     let queryBuilder = supabase
         .from('tours')
         .select('*')
@@ -51,7 +72,7 @@ export async function getTours(query?: string, status?: string) {
 
     if (error) {
         console.error('Turlar getirilirken hata:', error)
-        throw new Error('Turlar yüklenemedi')
+        throw new Error('Turlar yüklenemedi: ' + (error.message || 'Bilinmeyen hata'))
     }
 
     return data as Tour[]
