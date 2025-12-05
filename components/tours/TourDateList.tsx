@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Trash2, Calendar, Users } from 'lucide-react'
+import Link from 'next/link'
+import { Plus, Trash2, Calendar, Users, ExternalLink } from 'lucide-react'
 import { TourDate, PriceGroup, deleteTourDate } from '@/lib/actions/tour-details'
 import { formatDate } from '@/lib/utils'
 import TourDateForm from './TourDateForm'
@@ -79,8 +80,13 @@ export default function TourDateList({
                         ) : (
                             tourDates.map((date) => (
                                 <tr key={date.id} className="hover:bg-gray-50 transition-colors">
-                                    <td className="px-6 py-4 text-gray-900 font-medium">
-                                        {formatDate(date.start_date)} - {formatDate(date.end_date)}
+                                    <td className="px-6 py-4">
+                                        <Link
+                                            href={`/dashboard/tours/${tourId}/dates/${date.id}`}
+                                            className="text-gray-900 font-medium hover:text-blue-600"
+                                        >
+                                            {formatDate(date.start_date)} - {formatDate(date.end_date)}
+                                        </Link>
                                     </td>
                                     <td className="px-6 py-4 text-gray-600">
                                         {date.price_group?.name || '-'}
@@ -101,12 +107,21 @@ export default function TourDateList({
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 text-right">
-                                        <button
-                                            onClick={() => handleDelete(date.id)}
-                                            className="text-gray-400 hover:text-red-600 transition-colors"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
+                                        <div className="flex items-center justify-end gap-2">
+                                            <Link
+                                                href={`/dashboard/tours/${tourId}/dates/${date.id}`}
+                                                className="text-gray-400 hover:text-blue-600 transition-colors"
+                                                title="Detayları Gör"
+                                            >
+                                                <ExternalLink className="w-4 h-4" />
+                                            </Link>
+                                            <button
+                                                onClick={() => handleDelete(date.id)}
+                                                className="text-gray-400 hover:text-red-600 transition-colors"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             ))
