@@ -302,6 +302,82 @@ export async function cancelBooking(bookingId: string) {
     revalidatePath(`/dashboard/bookings`)
 }
 
+// --- Update Booking ---
+
+export async function updateBooking(
+    bookingId: string,
+    data: {
+        booking_status?: 'confirmed' | 'pending' | 'cancelled'
+        amount_paid?: number
+        notes?: string
+        passengers?: Passenger[]
+    }
+) {
+    const supabase = await createClient()
+
+    // Get current booking
+    const { data: currentBooking } = await supabase
+        .from('bookings')
+        .select('tour_date_id, pax, total_amount')
+        .eq('id', bookingId)
+        .single()
+
+    if (!currentBooking) {
+        throw new Error('Rezervasyon bulunamadı')
+    }
+
+    // Update booking
+    const updateData: Record<string, unknown> = {}
+    if (data.booking_status !== undefined) updateData.booking_status = data.booking_status
+    if (data.amount_paid !== undefined) updateData.amount_paid = data.amount_paid
+    if (data.notes !== undefined) updateData.notes = data.notes
+
+    if (Object.keys(updateData).length > 0) {
+        const { error: updateError } = await supabase
+            .from('bookings')
+            .update(updateData)
+            .eq('id', bookingId)
+
+        if (updateError) {
+            console.error('Rezervasyon güncellenirken hata:', updateError)
+            throw new Error(`Rezervasyon güncellenemedi: ${updateError.message}`)
+        }
+    }
+
+    // Update passengers if provided
+    if (data.passengers && data.passengers.length > 0) {
+        // Delete existing passengers
+        await supabase
+            .from('booking_passengers')
+            .delete()
+            .eq('booking_id', bookingId)
+
+        // Insert new passengers
+        const passengersToInsert = data.passengers.map(p => ({
+            booking_id: bookingId,
+            full_name: p.full_name,
+            tc_no: p.tc_no || null,
+            birth_date: p.birth_date && p.birth_date.trim() !== '' ? p.birth_date : null,
+            passenger_type: p.passenger_type,
+            phone: p.phone || null,
+            pickup_point: p.pickup_point || null,
+            notes: p.notes || null
+        }))
+
+        const { error: passengersError } = await supabase
+            .from('booking_passengers')
+            .insert(passengersToInsert)
+
+        if (passengersError) {
+            console.error('Yolcular güncellenirken hata:', passengersError)
+            throw new Error(`Yolcular güncellenemedi: ${passengersError.message}`)
+        }
+    }
+
+    revalidatePath(`/dashboard/tours`)
+    revalidatePath(`/dashboard/bookings`)
+}
+
 // --- Get Booking Stats ---
 
 export async function getBookingStats(tourDateId: string) {
