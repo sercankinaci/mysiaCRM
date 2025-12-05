@@ -61,6 +61,7 @@ export default async function TourDetailPage({
 
             {/* Tabs Component */}
             <TourDetailTabs
+                tour={tour}
                 tourId={id}
                 activeTab={tab}
                 priceGroups={priceGroups}

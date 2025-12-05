@@ -9,15 +9,27 @@ export type Tour = {
     id: string
     title: string
     slug: string
-    tour_type: string
+    description?: string
+    tour_type: 'daily' | 'package'
+    category: 'domestic' | 'abroad'
+    pricing_model: 'per_person' | 'room_based'
+    duration_days: number
+    duration_nights: number
+    child_age_min: number
+    child_age_max: number
+    baby_age_max: number
     status: 'draft' | 'active' | 'passive'
+    featured_image?: string
+    gallery?: string[]
     created_at: string
-    // Diğer detaylar opsiyonel veya ilişkisel tablolardan gelecek
+    updated_at?: string
 }
 
 export type CreateTourData = {
     title: string
-    tour_type: string
+    tour_type: 'daily' | 'package'
+    category: 'domestic' | 'abroad'
+    pricing_model: 'per_person' | 'room_based'
     slug: string
     status: 'draft' | 'active'
 }
@@ -93,14 +105,25 @@ export async function createTour(formData: FormData) {
 
     const title = formData.get('title') as string
     const tour_type = formData.get('tour_type') as string
+    const category = formData.get('category') as string || 'domestic'
+    const pricing_model = formData.get('pricing_model') as string || 'per_person'
+    const description = formData.get('description') as string || null
+
+    // Paket tur için süre bilgileri
+    const duration_days = parseInt(formData.get('duration_days') as string) || 1
+    const duration_nights = parseInt(formData.get('duration_nights') as string) || 0
+
+    // Yaş aralıkları
+    const child_age_min = parseInt(formData.get('child_age_min') as string) || 3
+    const child_age_max = parseInt(formData.get('child_age_max') as string) || 11
+    const baby_age_max = parseInt(formData.get('baby_age_max') as string) || 2
 
     // Validasyon
     if (!title || !tour_type) {
         return { error: 'Lütfen tur adı ve tipini belirtin.' }
     }
 
-    // Slug oluştur (Basitçe title'ı slug'a çevir)
-    // Gerçek uygulamada çakışma kontrolü yapılmalı veya unique constraint hatası yakalanmalı
+    // Slug oluştur
     const slug = title
         .toLowerCase()
         .replace(/ğ/g, 'g')
@@ -115,15 +138,23 @@ export async function createTour(formData: FormData) {
 
     const rawData = {
         title,
-        tour_type,
         slug,
-        status: 'draft' // Varsayılan olarak taslak
+        description,
+        tour_type,
+        category,
+        pricing_model,
+        duration_days,
+        duration_nights,
+        child_age_min,
+        child_age_max,
+        baby_age_max,
+        status: 'draft'
     }
 
     const { data, error } = await supabase
         .from('tours')
         .insert(rawData)
-        .select('id') // ID'yi al ki detay sayfasına yönlendirebilelim
+        .select('id')
         .single()
 
     if (error) {
@@ -132,7 +163,6 @@ export async function createTour(formData: FormData) {
     }
 
     revalidatePath('/dashboard/tours')
-    // Oluşturulan turun detay sayfasına yönlendir (Fiyat ve Tarih eklemek için)
     redirect(`/dashboard/tours/${data.id}`)
 }
 
@@ -158,6 +188,30 @@ export async function updateTour(id: string, formData: FormData) {
     if (error) {
         console.error('Tur güncellenirken hata:', error)
         return { error: 'Tur güncellenirken bir hata oluştu.' }
+    }
+
+    revalidatePath('/dashboard/tours')
+    revalidatePath(`/dashboard/tours/${id}`)
+    return { success: true }
+}
+
+// Tur durumunu güncelle
+export async function updateTourStatus(id: string, status: string) {
+    const supabase = await createClient()
+
+    // Geçerli durum kontrolü
+    if (!['draft', 'active', 'passive'].includes(status)) {
+        return { error: 'Geçersiz durum değeri.' }
+    }
+
+    const { error } = await supabase
+        .from('tours')
+        .update({ status })
+        .eq('id', id)
+
+    if (error) {
+        console.error('Tur durumu güncellenirken hata:', error)
+        return { error: 'Tur durumu güncellenemedi: ' + error.message }
     }
 
     revalidatePath('/dashboard/tours')

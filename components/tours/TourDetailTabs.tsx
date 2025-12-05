@@ -2,8 +2,11 @@
 
 import Link from 'next/link'
 import { PriceGroup, TourDate } from '@/lib/actions/tour-details'
+import { Tour } from '@/lib/actions/tours'
 import PriceGroupList from './PriceGroupList'
 import TourDateList from './TourDateList'
+import TourOverview from './TourOverview'
+import TourSettings from './TourSettings'
 
 const tabs = [
     { id: 'overview', label: 'Genel Bakış' },
@@ -13,11 +16,13 @@ const tabs = [
 ]
 
 export default function TourDetailTabs({
+    tour,
     tourId,
     activeTab,
     priceGroups,
     tourDates
 }: {
+    tour: Tour
     tourId: string
     activeTab: string
     priceGroups: PriceGroup[]
@@ -46,10 +51,11 @@ export default function TourDetailTabs({
             {/* Tab Content */}
             <div className="p-6">
                 {activeTab === 'overview' && (
-                    <div className="text-center py-12 text-gray-500">
-                        <p className="font-medium">Genel Bakış</p>
-                        <p className="text-sm mt-2">Burada turun genel bilgileri, açıklaması ve resimleri gösterilecek.</p>
-                    </div>
+                    <TourOverview
+                        tour={tour}
+                        priceGroups={priceGroups}
+                        tourDates={tourDates}
+                    />
                 )}
 
                 {activeTab === 'pricing' && (
@@ -61,10 +67,7 @@ export default function TourDetailTabs({
                 )}
 
                 {activeTab === 'settings' && (
-                    <div className="text-center py-12 text-gray-500">
-                        <p className="font-medium">Ayarlar</p>
-                        <p className="text-sm mt-2">Burada tur durumu, silme ve diğer ayarlar yapılacak.</p>
-                    </div>
+                    <TourSettings tour={tour} />
                 )}
             </div>
         </div>
