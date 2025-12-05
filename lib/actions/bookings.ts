@@ -154,6 +154,17 @@ export async function createBookingWithPassengers(data: {
 }) {
     const supabase = await createClient()
 
+    // 0. Get tour_id from tour_date
+    const { data: tourDate, error: tourDateError } = await supabase
+        .from('tour_dates')
+        .select('tour_id')
+        .eq('id', data.tour_date_id)
+        .single()
+
+    if (tourDateError || !tourDate) {
+        throw new Error('Tur tarihi bulunamadı')
+    }
+
     // 1. Create client if new
     let clientId = data.client_id
     if (!clientId && data.new_client) {
@@ -181,6 +192,7 @@ export async function createBookingWithPassengers(data: {
     const { data: booking, error: bookingError } = await supabase
         .from('bookings')
         .insert({
+            tour_id: tourDate.tour_id,
             tour_date_id: data.tour_date_id,
             client_id: clientId,
             pax,

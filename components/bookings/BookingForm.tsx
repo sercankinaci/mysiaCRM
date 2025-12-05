@@ -38,12 +38,25 @@ export default function BookingForm({
     ])
 
     // Paket Tur - Oda Konfigürasyonu
+    // Yetişkin sayısı oda tipine göre otomatik belirlenir (otelcilik kuralı)
     const [roomConfig, setRoomConfig] = useState({
         occupancy: 'double' as 'single' | 'double' | 'triple' | 'quad',
-        adults: 2,
         children: 0,
         babies: 0
     })
+
+    // Oda tipine göre yetişkin sayısı (sabit)
+    const getAdultsFromOccupancy = (occ: string) => {
+        switch (occ) {
+            case 'single': return 1
+            case 'double': return 2
+            case 'triple': return 3
+            case 'quad': return 4
+            default: return 2
+        }
+    }
+
+    const adults = getAdultsFromOccupancy(roomConfig.occupancy)
 
     const [paidAmount, setPaidAmount] = useState(0)
 
@@ -70,7 +83,7 @@ export default function BookingForm({
             const baby1Price = selectedPriceGroup.price_baby_1 || 0
             const baby2Price = selectedPriceGroup.price_baby_2 || 0
 
-            const adultTotal = roomConfig.adults * adultPrice
+            const adultTotal = adults * adultPrice
             const childTotal = roomConfig.children >= 1
                 ? child1Price + (roomConfig.children >= 2 ? child2Price * (roomConfig.children - 1) : 0)
                 : 0
@@ -79,7 +92,7 @@ export default function BookingForm({
                 : 0
 
             const total = adultTotal + childTotal + babyTotal
-            const breakdown = `${roomConfig.adults} Yetişkin (${roomConfig.occupancy.toUpperCase()} PP) + ${roomConfig.children} Çocuk + ${roomConfig.babies} Bebek`
+            const breakdown = `${adults} Yetişkin (${roomConfig.occupancy.toUpperCase()}) + ${roomConfig.children} Çocuk + ${roomConfig.babies} Bebek`
 
             return {
                 total,
@@ -142,7 +155,7 @@ export default function BookingForm({
     // Paket tur için otomatik yolcu listesi oluştur
     const getPackagePassengers = (): Passenger[] => {
         const list: Passenger[] = []
-        for (let i = 0; i < roomConfig.adults; i++) {
+        for (let i = 0; i < adults; i++) {
             list.push({ full_name: `Yetişkin ${i + 1}`, passenger_type: 'adult' })
         }
         for (let i = 0; i < roomConfig.children; i++) {
@@ -245,10 +258,10 @@ export default function BookingForm({
                                         disabled={isDisabled}
                                         onClick={() => setRoomConfig({ ...roomConfig, occupancy: occ as typeof roomConfig.occupancy })}
                                         className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${roomConfig.occupancy === occ
-                                                ? 'bg-purple-600 text-white'
-                                                : isDisabled
-                                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                                    : 'bg-white border border-purple-200 text-purple-700 hover:bg-purple-100'
+                                            ? 'bg-purple-600 text-white'
+                                            : isDisabled
+                                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                : 'bg-white border border-purple-200 text-purple-700 hover:bg-purple-100'
                                             }`}
                                     >
                                         {occ.toUpperCase()}
@@ -266,15 +279,13 @@ export default function BookingForm({
                     {/* Kişi Sayıları */}
                     <div className="grid grid-cols-3 gap-4">
                         <div>
-                            <label className="block text-xs text-purple-700 mb-1">Yetişkin</label>
-                            <input
-                                type="number"
-                                min="1"
-                                max="4"
-                                value={roomConfig.adults}
-                                onChange={(e) => setRoomConfig({ ...roomConfig, adults: parseInt(e.target.value) || 1 })}
-                                className="w-full px-3 py-2 border border-purple-200 rounded-lg text-sm"
-                            />
+                            <label className="block text-xs text-purple-700 mb-1">Yetişkin (Sabit)</label>
+                            <div className="w-full px-3 py-2 border border-purple-300 rounded-lg text-sm bg-purple-100 font-medium text-purple-800">
+                                {adults} kişi
+                            </div>
+                            <p className="text-xs text-purple-500 mt-1">
+                                {roomConfig.occupancy.toUpperCase()} odada {adults} yetişkin kalır
+                            </p>
                         </div>
                         <div>
                             <label className="block text-xs text-purple-700 mb-1">Çocuk</label>
@@ -491,8 +502,8 @@ export default function BookingForm({
                     type="submit"
                     disabled={loading}
                     className={`px-4 py-2 text-white rounded-lg text-sm disabled:opacity-50 ${pricingModel === 'room_based'
-                            ? 'bg-purple-600 hover:bg-purple-700'
-                            : 'bg-blue-600 hover:bg-blue-700'
+                        ? 'bg-purple-600 hover:bg-purple-700'
+                        : 'bg-blue-600 hover:bg-blue-700'
                         }`}
                 >
                     {loading ? 'Kaydediliyor...' : 'Rezervasyon Oluştur'}
