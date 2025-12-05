@@ -1,8 +1,8 @@
 import Link from 'next/link'
-import { Plus, Calendar, Users, DollarSign, MoreHorizontal, Filter } from 'lucide-react'
+import { Plus, Filter, MoreHorizontal, Map } from 'lucide-react'
 import Search from '@/components/ui/search'
 import { getTours } from '@/lib/actions/tours'
-import { formatDate, formatCurrency } from '@/lib/utils'
+import { formatDate } from '@/lib/utils'
 
 export default async function ToursPage({
     searchParams,
@@ -21,7 +21,7 @@ export default async function ToursPage({
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Turlar</h1>
-                    <p className="text-gray-500">Tüm turları yönetin ve takip edin</p>
+                    <p className="text-gray-500">Tüm tur programlarını yönetin</p>
                 </div>
                 <Link
                     href="/dashboard/tours/new"
@@ -42,16 +42,11 @@ export default async function ToursPage({
                     <select
                         className="border border-gray-200 rounded-md py-2 pl-3 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                         defaultValue={status}
-                    // Not: Bu select değiştiğinde URL'i güncellemek için client component lazım.
-                    // Şimdilik basit tutmak için form submit veya link kullanabiliriz.
-                    // Veya Search bileşenini genişletebiliriz.
-                    // Basitlik adına şimdilik statik bırakıyorum, sonra geliştiririz.
                     >
                         <option value="all">Tüm Durumlar</option>
                         <option value="active">Aktif</option>
                         <option value="draft">Taslak</option>
-                        <option value="completed">Tamamlandı</option>
-                        <option value="cancelled">İptal</option>
+                        <option value="passive">Pasif</option>
                     </select>
                 </div>
             </div>
@@ -63,18 +58,16 @@ export default async function ToursPage({
                         <thead className="bg-gray-50 border-b border-gray-100">
                             <tr>
                                 <th className="px-6 py-4 font-semibold text-gray-700">Tur Adı</th>
-                                <th className="px-6 py-4 font-semibold text-gray-700">Tarih</th>
-                                <th className="px-6 py-4 font-semibold text-gray-700">Kapasite</th>
-                                <th className="px-6 py-4 font-semibold text-gray-700">Fiyat</th>
+                                <th className="px-6 py-4 font-semibold text-gray-700">Tip</th>
                                 <th className="px-6 py-4 font-semibold text-gray-700">Durum</th>
-                                <th className="px-6 py-4 font-semibold text-gray-700">Finans</th>
+                                <th className="px-6 py-4 font-semibold text-gray-700">Oluşturulma</th>
                                 <th className="px-6 py-4 font-semibold text-gray-700 text-right">İşlemler</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                             {tours.length === 0 ? (
                                 <tr>
-                                    <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                                    <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
                                         Kayıtlı tur bulunamadı.
                                     </td>
                                 </tr>
@@ -82,24 +75,18 @@ export default async function ToursPage({
                                 tours.map((tour) => (
                                     <tr key={tour.id} className="hover:bg-gray-50 transition-colors">
                                         <td className="px-6 py-4 font-medium text-gray-900">
-                                            <Link href={`/dashboard/tours/${tour.id}`} className="hover:text-blue-600">
+                                            <Link href={`/dashboard/tours/${tour.id}`} className="hover:text-blue-600 block">
                                                 {tour.title}
+                                                <span className="block text-xs text-gray-400 font-normal mt-0.5">
+                                                    /{tour.slug}
+                                                </span>
                                             </Link>
                                         </td>
                                         <td className="px-6 py-4 text-gray-600">
                                             <div className="flex items-center gap-2">
-                                                <Calendar className="w-4 h-4 text-gray-400" />
-                                                {formatDate(tour.start_date)}
+                                                <Map className="w-4 h-4 text-gray-400" />
+                                                <span className="capitalize">{tour.tour_type}</span>
                                             </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-gray-600">
-                                            <div className="flex items-center gap-2">
-                                                <Users className="w-4 h-4 text-gray-400" />
-                                                {tour.capacity} Kişi
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 font-medium text-gray-900">
-                                            {formatCurrency(tour.price)}
                                         </td>
                                         <td className="px-6 py-4">
                                             <span
@@ -108,33 +95,26 @@ export default async function ToursPage({
                                                         ? 'bg-green-100 text-green-800'
                                                         : tour.status === 'draft'
                                                             ? 'bg-gray-100 text-gray-800'
-                                                            : tour.status === 'cancelled'
-                                                                ? 'bg-red-100 text-red-800'
-                                                                : 'bg-blue-100 text-blue-800'
+                                                            : 'bg-red-100 text-red-800'
                                                     }`}
                                             >
                                                 {tour.status === 'active'
                                                     ? 'Aktif'
                                                     : tour.status === 'draft'
                                                         ? 'Taslak'
-                                                        : tour.status === 'cancelled'
-                                                            ? 'İptal'
-                                                            : tour.status === 'completed'
-                                                                ? 'Tamamlandı'
-                                                                : tour.status}
+                                                        : 'Pasif'}
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <div className="text-xs space-y-1">
-                                                <div className="text-green-600">Gelir: {formatCurrency(tour.total_income)}</div>
-                                                <div className="text-red-600">Gider: {formatCurrency(tour.total_expense)}</div>
-                                                <div className="font-semibold text-gray-900">Net: {formatCurrency(tour.net_profit)}</div>
-                                            </div>
+                                        <td className="px-6 py-4 text-gray-500">
+                                            {formatDate(tour.created_at)}
                                         </td>
                                         <td className="px-6 py-4 text-right">
-                                            <button className="text-gray-400 hover:text-gray-600">
-                                                <MoreHorizontal className="w-5 h-5" />
-                                            </button>
+                                            <Link
+                                                href={`/dashboard/tours/${tour.id}`}
+                                                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                                            >
+                                                Yönet
+                                            </Link>
                                         </td>
                                     </tr>
                                 ))

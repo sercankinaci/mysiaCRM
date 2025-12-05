@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Calendar, Users, DollarSign, ArrowLeft, Save } from 'lucide-react'
+import { ArrowLeft, Save, Map } from 'lucide-react'
 import { createTour } from '@/lib/actions/tours'
 
 export default function NewTourPage() {
@@ -21,7 +21,7 @@ export default function NewTourPage() {
             setError(result.error)
             setLoading(false)
         } else {
-            // Başarılı olursa zaten redirect olacak
+            // Başarılı olursa action içinde redirect yapılacak
         }
     }
 
@@ -37,7 +37,7 @@ export default function NewTourPage() {
                 </Link>
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Yeni Tur Ekle</h1>
-                    <p className="text-gray-500">Yeni bir tur programı oluşturun</p>
+                    <p className="text-gray-500">Turun temel bilgilerini girin</p>
                 </div>
             </div>
 
@@ -59,98 +59,33 @@ export default function NewTourPage() {
                             name="title"
                             id="title"
                             required
-                            placeholder="Örn: Kapadokya Turu"
+                            placeholder="Örn: Büyük Balkan Turu"
                             className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                         />
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                            <label htmlFor="start_date" className="block text-sm font-medium text-gray-700 mb-1">
-                                Başlangıç Tarihi
-                            </label>
-                            <div className="relative">
-                                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                <input
-                                    type="date"
-                                    name="start_date"
-                                    id="start_date"
-                                    required
-                                    className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                                />
-                            </div>
-                        </div>
-
-                        <div>
-                            <label htmlFor="end_date" className="block text-sm font-medium text-gray-700 mb-1">
-                                Bitiş Tarihi
-                            </label>
-                            <div className="relative">
-                                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                <input
-                                    type="date"
-                                    name="end_date"
-                                    id="end_date"
-                                    required
-                                    className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                            <label htmlFor="capacity" className="block text-sm font-medium text-gray-700 mb-1">
-                                Kapasite (Kişi)
-                            </label>
-                            <div className="relative">
-                                <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                <input
-                                    type="number"
-                                    name="capacity"
-                                    id="capacity"
-                                    required
-                                    min="1"
-                                    placeholder="45"
-                                    className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                                />
-                            </div>
-                        </div>
-
-                        <div>
-                            <label htmlFor="price" className="block text-sm font-medium text-gray-700 mb-1">
-                                Fiyat (Kişi Başı)
-                            </label>
-                            <div className="relative">
-                                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                <input
-                                    type="number"
-                                    name="price"
-                                    id="price"
-                                    required
-                                    min="0"
-                                    step="0.01"
-                                    placeholder="1500.00"
-                                    className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                                />
-                            </div>
-                        </div>
-                    </div>
-
                     <div>
-                        <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-1">
-                            Durum
+                        <label htmlFor="tour_type" className="block text-sm font-medium text-gray-700 mb-1">
+                            Tur Tipi
                         </label>
-                        <select
-                            name="status"
-                            id="status"
-                            className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all bg-white"
-                        >
-                            <option value="draft">Taslak (Hazırlık Aşamasında)</option>
-                            <option value="active">Aktif (Satışa Açık)</option>
-                        </select>
+                        <div className="relative">
+                            <Map className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                            <select
+                                name="tour_type"
+                                id="tour_type"
+                                required
+                                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all bg-white"
+                            >
+                                <option value="">Seçiniz...</option>
+                                <option value="daily">Günübirlik Tur</option>
+                                <option value="cultural">Kültür Turu (Konaklamalı)</option>
+                                <option value="ship">Gemi Turu</option>
+                                <option value="abroad">Yurt Dışı Turu</option>
+                                <option value="visa">Vizeli Tur</option>
+                            </select>
+                        </div>
                         <p className="text-xs text-gray-500 mt-1">
-                            Aktif turlar müşteriler tarafından görülebilir ve rezervasyon yapılabilir.
+                            Tur tipine göre fiyatlandırma ve tarih seçenekleri belirlenecektir.
                         </p>
                     </div>
                 </div>
@@ -166,7 +101,7 @@ export default function NewTourPage() {
                         ) : (
                             <>
                                 <Save className="w-4 h-4" />
-                                Turu Kaydet
+                                Devam Et
                             </>
                         )}
                     </button>

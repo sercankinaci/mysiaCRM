@@ -4,28 +4,21 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
-// Tur Tipi Tanımları (Veritabanı şemasına uygun)
+// Tur Tipi Tanımları (Yeni Veritabanı şemasına uygun)
 export type Tour = {
     id: string
     title: string
-    start_date: string
-    end_date: string
-    capacity: number
-    price: number
-    status: 'draft' | 'active' | 'cancelled' | 'completed' | 'postponed'
-    total_income: number
-    total_expense: number
-    net_profit: number
-    cancellation_reason?: string | null
+    slug: string
+    tour_type: string
+    status: 'draft' | 'active' | 'passive'
     created_at: string
+    // Diğer detaylar opsiyonel veya ilişkisel tablolardan gelecek
 }
 
 export type CreateTourData = {
     title: string
-    start_date: string
-    end_date: string
-    capacity: number
-    price: number
+    tour_type: string
+    slug: string
     status: 'draft' | 'active'
 }
 
@@ -53,12 +46,10 @@ export async function getTours(query?: string, status?: string) {
         throw new Error('Kullanıcı profili bulunamadı. Lütfen yöneticinize başvurun.')
     }
 
-    console.log('Kullanıcı bilgisi:', { id: user.id, role: profile.role })
-
     let queryBuilder = supabase
         .from('tours')
         .select('*')
-        .order('start_date', { ascending: true })
+        .order('created_at', { ascending: false })
 
     if (query) {
         queryBuilder = queryBuilder.ilike('title', `%${query}%`)
@@ -100,31 +91,49 @@ export async function getTourById(id: string) {
 export async function createTour(formData: FormData) {
     const supabase = await createClient()
 
-    const rawData: CreateTourData = {
-        title: formData.get('title') as string,
-        start_date: formData.get('start_date') as string,
-        end_date: formData.get('end_date') as string,
-        capacity: Number(formData.get('capacity')),
-        price: Number(formData.get('price')),
-        status: formData.get('status') as 'draft' | 'active' || 'draft',
+    const title = formData.get('title') as string
+    const tour_type = formData.get('tour_type') as string
+
+    // Validasyon
+    if (!title || !tour_type) {
+        return { error: 'Lütfen tur adı ve tipini belirtin.' }
     }
 
-    // Validasyon (Basit)
-    if (!rawData.title || !rawData.start_date || !rawData.end_date || rawData.capacity <= 0 || rawData.price < 0) {
-        return { error: 'Lütfen tüm alanları geçerli şekilde doldurun.' }
+    // Slug oluştur (Basitçe title'ı slug'a çevir)
+    // Gerçek uygulamada çakışma kontrolü yapılmalı veya unique constraint hatası yakalanmalı
+    const slug = title
+        .toLowerCase()
+        .replace(/ğ/g, 'g')
+        .replace(/ü/g, 'u')
+        .replace(/ş/g, 's')
+        .replace(/ı/g, 'i')
+        .replace(/ö/g, 'o')
+        .replace(/ç/g, 'c')
+        .replace(/[^a-z0-9-]/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '') + '-' + Date.now().toString().slice(-4)
+
+    const rawData = {
+        title,
+        tour_type,
+        slug,
+        status: 'draft' // Varsayılan olarak taslak
     }
 
-    const { error } = await supabase
+    const { data, error } = await supabase
         .from('tours')
         .insert(rawData)
+        .select('id') // ID'yi al ki detay sayfasına yönlendirebilelim
+        .single()
 
     if (error) {
         console.error('Tur oluşturulurken hata:', error)
-        return { error: 'Tur oluşturulurken bir hata oluştu.' }
+        return { error: 'Tur oluşturulurken bir hata oluştu: ' + error.message }
     }
 
     revalidatePath('/dashboard/tours')
-    redirect('/dashboard/tours')
+    // Oluşturulan turun detay sayfasına yönlendir (Fiyat ve Tarih eklemek için)
+    redirect(`/dashboard/tours/${data.id}`)
 }
 
 // Turu güncelle

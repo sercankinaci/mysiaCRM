@@ -13,9 +13,10 @@ export function formatDate(dateString: string) {
     })
 }
 
-export function formatCurrency(amount: number) {
+export function formatCurrency(amount: number, currency: string = 'TRY') {
     return new Intl.NumberFormat('tr-TR', {
         style: 'currency',
-        currency: 'TRY',
+        currency: currency,
     }).format(amount)
 }
+
