@@ -219,12 +219,12 @@ export async function createBookingWithPassengers(data: {
     const passengersToInsert = data.passengers.map(p => ({
         booking_id: booking.id,
         full_name: p.full_name,
-        tc_no: p.tc_no,
-        birth_date: p.birth_date,
+        tc_no: p.tc_no || null,
+        birth_date: p.birth_date && p.birth_date.trim() !== '' ? p.birth_date : null,
         passenger_type: p.passenger_type,
-        phone: p.phone,
-        pickup_point: p.pickup_point,
-        notes: p.notes
+        phone: p.phone || null,
+        pickup_point: p.pickup_point || null,
+        notes: p.notes || null
     }))
 
     const { error: passengersError } = await supabase
