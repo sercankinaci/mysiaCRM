@@ -59,7 +59,7 @@ export default function TourDetailTabs({
                 )}
 
                 {activeTab === 'pricing' && (
-                    <PriceGroupList tourId={tourId} priceGroups={priceGroups} />
+                    <PriceGroupList tour={tour} tourId={tourId} priceGroups={priceGroups} />
                 )}
 
                 {activeTab === 'dates' && (

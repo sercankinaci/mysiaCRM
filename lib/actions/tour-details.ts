@@ -10,12 +10,28 @@ export type PriceGroup = {
     tour_id: string
     name: string
     currency: string
-    pricing: {
+    // Kişi başı fiyatlandırma (günübirlik turlar)
+    pricing?: {
         adult: number
         child: number
         baby: number
     }
+    price_adult?: number
+    price_child?: number
+    price_baby?: number
+    // Oda bazlı fiyatlandırma (paket turlar)
+    max_pax?: number
+    price_single_pp?: number
+    price_double_pp?: number
+    price_triple_pp?: number
+    price_quad_pp?: number
+    price_child_1?: number
+    price_child_2?: number
+    price_baby_1?: number
+    price_baby_2?: number
+
     status: 'active' | 'passive'
+    sort_order?: number
     created_at: string
 }
 
@@ -41,6 +57,7 @@ export async function getPriceGroups(tourId: string) {
         .from('tour_price_groups')
         .select('*')
         .eq('tour_id', tourId)
+        .order('sort_order', { ascending: true })
         .order('created_at', { ascending: false })
 
     if (error) {
@@ -51,32 +68,58 @@ export async function getPriceGroups(tourId: string) {
     return data as PriceGroup[]
 }
 
-export async function createPriceGroup(tourId: string, formData: FormData) {
+export async function createPriceGroup(tourId: string, formData: FormData, pricingModel: string = 'per_person') {
     const supabase = await createClient()
 
     const name = formData.get('name') as string
     const currency = formData.get('currency') as string
-    const adultPrice = parseFloat(formData.get('price_adult') as string) || 0
-    const childPrice = parseFloat(formData.get('price_child') as string) || 0
-    const babyPrice = parseFloat(formData.get('price_baby') as string) || 0
 
-    const pricing = {
-        adult: adultPrice,
-        child: childPrice,
-        baby: babyPrice
+    let insertData: Record<string, unknown> = {
+        tour_id: tourId,
+        name,
+        currency,
+        status: 'active'
     }
 
-    console.log('Creating price group:', { tourId, name, currency, pricing })
+    if (pricingModel === 'room_based') {
+        // Paket Tur - Oda Bazlı Fiyatlandırma
+        insertData = {
+            ...insertData,
+            max_pax: parseInt(formData.get('max_pax') as string) || 4,
+            price_single_pp: parseFloat(formData.get('price_single_pp') as string) || null,
+            price_double_pp: parseFloat(formData.get('price_double_pp') as string) || null,
+            price_triple_pp: parseFloat(formData.get('price_triple_pp') as string) || null,
+            price_quad_pp: parseFloat(formData.get('price_quad_pp') as string) || null,
+            price_child_1: parseFloat(formData.get('price_child_1') as string) || null,
+            price_child_2: parseFloat(formData.get('price_child_2') as string) || null,
+            price_baby_1: parseFloat(formData.get('price_baby_1') as string) || 0,
+            price_baby_2: parseFloat(formData.get('price_baby_2') as string) || 0,
+        }
+    } else {
+        // Günübirlik Tur - Kişi Başı Fiyatlandırma
+        const adultPrice = parseFloat(formData.get('price_adult') as string) || 0
+        const childPrice = parseFloat(formData.get('price_child') as string) || 0
+        const babyPrice = parseFloat(formData.get('price_baby') as string) || 0
+
+        insertData = {
+            ...insertData,
+            price_adult: adultPrice,
+            price_child: childPrice,
+            price_baby: babyPrice,
+            // Eski format için de (geriye uyumluluk)
+            pricing: {
+                adult: adultPrice,
+                child: childPrice,
+                baby: babyPrice
+            }
+        }
+    }
+
+    console.log('Creating price group:', insertData)
 
     const { data, error } = await supabase
         .from('tour_price_groups')
-        .insert({
-            tour_id: tourId,
-            name,
-            currency,
-            pricing,
-            status: 'active'
-        })
+        .insert(insertData)
         .select()
 
     if (error) {
