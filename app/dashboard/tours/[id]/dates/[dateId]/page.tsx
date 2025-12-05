@@ -35,13 +35,8 @@ export default async function TourDateDetailPage({
 
     const capacityPercent = ((tourDate.capacity_total - tourDate.capacity_available) / tourDate.capacity_total) * 100
 
-    // Price info for booking form
-    const priceInfo = {
-        adult: priceGroup?.pricing?.adult || 0,
-        child: priceGroup?.pricing?.child || 0,
-        baby: priceGroup?.pricing?.baby || 0,
-        currency: priceGroup?.currency || 'TRY'
-    }
+    // Pricing model from tour
+    const pricingModel = tour.pricing_model || 'per_person'
 
     return (
         <div className="space-y-6">
@@ -61,9 +56,17 @@ export default async function TourDateDetailPage({
                         <span>/</span>
                         <span>Tarih Detayı</span>
                     </div>
-                    <h1 className="text-2xl font-bold text-gray-900 mt-1">
-                        {formatDate(tourDate.start_date)} - {formatDate(tourDate.end_date)}
-                    </h1>
+                    <div className="flex items-center gap-3 mt-1">
+                        <h1 className="text-2xl font-bold text-gray-900">
+                            {formatDate(tourDate.start_date)} - {formatDate(tourDate.end_date)}
+                        </h1>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${pricingModel === 'room_based'
+                                ? 'bg-purple-100 text-purple-700'
+                                : 'bg-blue-100 text-blue-700'
+                            }`}>
+                            {pricingModel === 'room_based' ? '📦 Paket Tur' : '☀️ Günübirlik'}
+                        </span>
+                    </div>
                 </div>
             </div>
 
@@ -145,8 +148,10 @@ export default async function TourDateDetailPage({
             <BookingList
                 tourDateId={dateId}
                 bookings={bookings}
-                priceInfo={priceInfo}
+                pricingModel={pricingModel as 'per_person' | 'room_based'}
+                priceGroups={priceGroups}
             />
         </div>
     )
 }
+

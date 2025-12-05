@@ -57,7 +57,7 @@ WHERE tour_type IS NULL OR tour_type NOT IN ('daily', 'package');
 -- 2. TOUR_PRICE_GROUPS TABLOSU GÜNCELLEMESİ
 -- ============================================================================
 
--- 2.1 Kişi başı fiyat alanları ekle (eski prisma yapısı yerine)
+-- 2.1 Kişi başı fiyat alanları ekle (günübirlik turlar için)
 ALTER TABLE mysiacrm.tour_price_groups 
 ADD COLUMN IF NOT EXISTS price_adult DECIMAL(12, 2);
 
@@ -70,7 +70,35 @@ ADD COLUMN IF NOT EXISTS price_baby DECIMAL(12, 2) DEFAULT 0;
 ALTER TABLE mysiacrm.tour_price_groups 
 ADD COLUMN IF NOT EXISTS sort_order INT DEFAULT 0;
 
--- 2.2 Mevcut pricing JSONB'den yeni alanlara veri taşı (eğer varsa)
+-- 2.2 Oda bazlı fiyat alanları ekle (paket turlar için)
+ALTER TABLE mysiacrm.tour_price_groups 
+ADD COLUMN IF NOT EXISTS max_pax INT DEFAULT 4;
+
+ALTER TABLE mysiacrm.tour_price_groups 
+ADD COLUMN IF NOT EXISTS price_single_pp DECIMAL(12, 2);
+
+ALTER TABLE mysiacrm.tour_price_groups 
+ADD COLUMN IF NOT EXISTS price_double_pp DECIMAL(12, 2);
+
+ALTER TABLE mysiacrm.tour_price_groups 
+ADD COLUMN IF NOT EXISTS price_triple_pp DECIMAL(12, 2);
+
+ALTER TABLE mysiacrm.tour_price_groups 
+ADD COLUMN IF NOT EXISTS price_quad_pp DECIMAL(12, 2);
+
+ALTER TABLE mysiacrm.tour_price_groups 
+ADD COLUMN IF NOT EXISTS price_child_1 DECIMAL(12, 2);
+
+ALTER TABLE mysiacrm.tour_price_groups 
+ADD COLUMN IF NOT EXISTS price_child_2 DECIMAL(12, 2);
+
+ALTER TABLE mysiacrm.tour_price_groups 
+ADD COLUMN IF NOT EXISTS price_baby_1 DECIMAL(12, 2) DEFAULT 0;
+
+ALTER TABLE mysiacrm.tour_price_groups 
+ADD COLUMN IF NOT EXISTS price_baby_2 DECIMAL(12, 2) DEFAULT 0;
+
+-- 2.3 Mevcut pricing JSONB'den yeni alanlara veri taşı (eğer varsa)
 UPDATE mysiacrm.tour_price_groups
 SET 
   price_adult = (pricing->>'adult')::DECIMAL,

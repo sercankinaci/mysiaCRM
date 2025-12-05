@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Users, Phone, ChevronDown, ChevronUp, Check, Clock, X } from 'lucide-react'
+import { Plus, Users, Phone, ChevronDown, ChevronUp, Check, Clock, X, Home } from 'lucide-react'
 import { Booking } from '@/lib/actions/bookings'
+import { PriceGroup } from '@/lib/actions/tour-details'
 import { formatCurrency } from '@/lib/utils'
 import BookingForm from './BookingForm'
 
@@ -12,30 +13,39 @@ const statusConfig = {
     cancelled: { label: 'İptal', color: 'bg-red-100 text-red-800', icon: X }
 } as const
 
+type PricingModel = 'per_person' | 'room_based'
+
+interface BookingListProps {
+    tourDateId: string
+    bookings: Booking[]
+    pricingModel: PricingModel
+    priceGroups: PriceGroup[]
+}
+
 export default function BookingList({
     tourDateId,
     bookings,
-    priceInfo
-}: {
-    tourDateId: string
-    bookings: Booking[]
-    priceInfo: {
-        adult: number
-        child: number
-        baby: number
-        currency: string
-    }
-}) {
+    pricingModel,
+    priceGroups
+}: BookingListProps) {
     const [isFormOpen, setIsFormOpen] = useState(false)
     const [expandedBooking, setExpandedBooking] = useState<string | null>(null)
+
+    const isPackageTour = pricingModel === 'room_based'
 
     return (
         <div className="bg-white rounded-xl border border-gray-200 p-6">
             <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-semibold text-gray-900">Rezervasyonlar</h2>
+                <div>
+                    <h2 className="text-lg font-semibold text-gray-900">Rezervasyonlar</h2>
+                    <p className="text-xs text-gray-500">
+                        {isPackageTour ? '📦 Paket Tur - Oda Bazlı' : '☀️ Günübirlik - Kişi Başı'}
+                    </p>
+                </div>
                 <button
                     onClick={() => setIsFormOpen(true)}
-                    className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm"
+                    className={`flex items-center gap-2 text-white px-4 py-2 rounded-lg text-sm ${isPackageTour ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'
+                        }`}
                 >
                     <Plus className="w-4 h-4" />
                     Rezervasyon Ekle
@@ -43,11 +53,15 @@ export default function BookingList({
             </div>
 
             {isFormOpen && (
-                <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                    <h3 className="text-sm font-semibold text-gray-900 mb-4">Yeni Rezervasyon</h3>
+                <div className={`mb-6 p-4 rounded-lg border ${isPackageTour ? 'bg-purple-50 border-purple-200' : 'bg-gray-50 border-gray-200'
+                    }`}>
+                    <h3 className={`text-sm font-semibold mb-4 ${isPackageTour ? 'text-purple-900' : 'text-gray-900'}`}>
+                        Yeni Rezervasyon
+                    </h3>
                     <BookingForm
                         tourDateId={tourDateId}
-                        priceInfo={priceInfo}
+                        pricingModel={pricingModel}
+                        priceGroups={priceGroups}
                         onClose={() => setIsFormOpen(false)}
                     />
                 </div>
@@ -74,8 +88,13 @@ export default function BookingList({
                                     onClick={() => setExpandedBooking(isExpanded ? null : booking.id)}
                                 >
                                     <div className="flex items-center gap-4">
-                                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                                            <Users className="w-5 h-5 text-blue-600" />
+                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isPackageTour ? 'bg-purple-100' : 'bg-blue-100'
+                                            }`}>
+                                            {isPackageTour ? (
+                                                <Home className={`w-5 h-5 text-purple-600`} />
+                                            ) : (
+                                                <Users className={`w-5 h-5 text-blue-600`} />
+                                            )}
                                         </div>
                                         <div>
                                             <p className="font-medium text-gray-900">
