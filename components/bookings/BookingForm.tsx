@@ -38,52 +38,49 @@ export default function BookingForm({
     ])
 
     // Paket Tur - Oda Konfigürasyonu
-    // Yetişkin sayısı oda tipine göre otomatik belirlenir (otelcilik kuralı)
+    // Kullanıcı yetişkin sayısını seçer, oda tipi otomatik belirlenir
     const [roomConfig, setRoomConfig] = useState({
-        occupancy: 'double' as 'single' | 'double' | 'triple' | 'quad',
-        children: 0,
-        babies: 0
+        adults: 1,      // Kullanıcı seçer (mevcut fiyatlara göre 1-4 arası)
+        children: 0,    // max_pax - adults kadar
+        babies: 0       // max_pax - adults - children kadar
     })
 
-    // Oda tipine göre yetişkin sayısı (sabit)
-    const getAdultsFromOccupancy = (occ: string) => {
-        switch (occ) {
-            case 'single': return 1
-            case 'double': return 2
-            case 'triple': return 3
-            case 'quad': return 4
-            default: return 2
+    const [paidAmount, setPaidAmount] = useState(0)
+
+    // Yetişkin sayısına göre oda tipini ve fiyatını belirle
+    const getOccupancyAndPrice = (adultCount: number) => {
+        if (!selectedPriceGroup) return { occupancy: 'SNG', price: 0 }
+
+        switch (adultCount) {
+            case 1: return { occupancy: 'SNG', price: selectedPriceGroup.price_single_pp || 0 }
+            case 2: return { occupancy: 'DBL', price: selectedPriceGroup.price_double_pp || 0 }
+            case 3: return { occupancy: 'TRPL', price: selectedPriceGroup.price_triple_pp || 0 }
+            case 4: return { occupancy: 'QUAD', price: selectedPriceGroup.price_quad_pp || 0 }
+            default: return { occupancy: 'SNG', price: selectedPriceGroup.price_single_pp || 0 }
         }
     }
 
-    const adults = getAdultsFromOccupancy(roomConfig.occupancy)
-
-    const [paidAmount, setPaidAmount] = useState(0)
+    // Oda kapasitesi - çocuk+bebek için limit
+    const maxPax = selectedPriceGroup?.max_pax || 4
+    const maxExtraPersons = Math.max(0, maxPax - roomConfig.adults)
 
     // Fiyat Hesaplama
     const priceCalculation = useMemo(() => {
         if (!selectedPriceGroup) {
-            return { total: 0, breakdown: '', currency: 'TRY' }
+            return { total: 0, breakdown: '', currency: 'TRY', occupancy: 'SNG', adultPrice: 0, childPrice: 0, babyPrice: 0 }
         }
 
         const currency = selectedPriceGroup.currency || 'TRY'
 
         if (pricingModel === 'room_based') {
-            // Paket Tur - Oda Bazlı Hesaplama
-            let adultPrice = 0
-            switch (roomConfig.occupancy) {
-                case 'single': adultPrice = selectedPriceGroup.price_single_pp || 0; break
-                case 'double': adultPrice = selectedPriceGroup.price_double_pp || 0; break
-                case 'triple': adultPrice = selectedPriceGroup.price_triple_pp || 0; break
-                case 'quad': adultPrice = selectedPriceGroup.price_quad_pp || 0; break
-            }
+            const { occupancy, price: adultPrice } = getOccupancyAndPrice(roomConfig.adults)
 
             const child1Price = selectedPriceGroup.price_child_1 || 0
             const child2Price = selectedPriceGroup.price_child_2 || 0
             const baby1Price = selectedPriceGroup.price_baby_1 || 0
             const baby2Price = selectedPriceGroup.price_baby_2 || 0
 
-            const adultTotal = adults * adultPrice
+            const adultTotal = roomConfig.adults * adultPrice
             const childTotal = roomConfig.children >= 1
                 ? child1Price + (roomConfig.children >= 2 ? child2Price * (roomConfig.children - 1) : 0)
                 : 0
@@ -92,18 +89,10 @@ export default function BookingForm({
                 : 0
 
             const total = adultTotal + childTotal + babyTotal
-            const breakdown = `${adults} Yetişkin (${roomConfig.occupancy.toUpperCase()}) + ${roomConfig.children} Çocuk + ${roomConfig.babies} Bebek`
+            const breakdown = `${roomConfig.adults} Yetişkin (${occupancy}) + ${roomConfig.children} Çocuk + ${roomConfig.babies} Bebek`
 
-            return {
-                total,
-                breakdown,
-                currency,
-                adultPrice,
-                childPrice: child1Price,
-                babyPrice: baby1Price
-            }
+            return { total, breakdown, currency, occupancy, adultPrice, childPrice: child1Price, babyPrice: baby1Price }
         } else {
-            // Günübirlik Tur - Kişi Başı Hesaplama
             const paxCounts = {
                 adult: passengers.filter(p => p.passenger_type === 'adult').length,
                 child: passengers.filter(p => p.passenger_type === 'child').length,
@@ -114,25 +103,14 @@ export default function BookingForm({
             const childPrice = selectedPriceGroup.price_child || selectedPriceGroup.pricing?.child || 0
             const babyPrice = selectedPriceGroup.price_baby || selectedPriceGroup.pricing?.baby || 0
 
-            const total =
-                (paxCounts.adult * adultPrice) +
-                (paxCounts.child * childPrice) +
-                (paxCounts.baby * babyPrice)
-
+            const total = (paxCounts.adult * adultPrice) + (paxCounts.child * childPrice) + (paxCounts.baby * babyPrice)
             const breakdown = `${paxCounts.adult} Yetişkin + ${paxCounts.child} Çocuk + ${paxCounts.baby} Bebek`
 
-            return {
-                total,
-                breakdown,
-                currency,
-                adultPrice,
-                childPrice,
-                babyPrice
-            }
+            return { total, breakdown, currency, occupancy: '', adultPrice, childPrice, babyPrice }
         }
     }, [pricingModel, selectedPriceGroup, passengers, roomConfig])
 
-    // Yolcu İşlemleri (Günübirlik için)
+    // Yolcu İşlemleri
     const addPassenger = () => {
         setPassengers([
             ...passengers,
@@ -152,10 +130,10 @@ export default function BookingForm({
         ))
     }
 
-    // Paket tur için otomatik yolcu listesi oluştur
+    // Paket tur için otomatik yolcu listesi
     const getPackagePassengers = (): Passenger[] => {
         const list: Passenger[] = []
-        for (let i = 0; i < adults; i++) {
+        for (let i = 0; i < roomConfig.adults; i++) {
             list.push({ full_name: `Yetişkin ${i + 1}`, passenger_type: 'adult' })
         }
         for (let i = 0; i < roomConfig.children; i++) {
@@ -170,7 +148,6 @@ export default function BookingForm({
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
 
-        // Validation
         if (isNewClient && !newClient.full_name.trim()) {
             alert('Müşteri adı gerekli')
             return
@@ -244,76 +221,94 @@ export default function BookingForm({
                         Oda Konfigürasyonu
                     </h4>
 
-                    {/* Oda Tipi */}
+                    {/* Yetişkin Sayısı Seçimi */}
                     <div>
-                        <label className="block text-xs text-purple-700 mb-2">Kişi Başı Fiyat Tipi</label>
+                        <label className="block text-xs text-purple-700 mb-2">Yetişkin Sayısı</label>
                         <div className="grid grid-cols-4 gap-2">
-                            {['single', 'double', 'triple', 'quad'].map((occ) => {
-                                const occupancyPrice = selectedPriceGroup?.[`price_${occ}_pp` as keyof PriceGroup]
-                                const isDisabled = !occupancyPrice || occupancyPrice === 0
+                            {[1, 2, 3, 4].map((num) => {
+                                const { price, occupancy } = getOccupancyAndPrice(num)
+                                const isAvailable = price > 0
+                                const isSelected = roomConfig.adults === num
                                 return (
                                     <button
-                                        key={occ}
+                                        key={num}
                                         type="button"
-                                        disabled={isDisabled}
-                                        onClick={() => setRoomConfig({ ...roomConfig, occupancy: occ as typeof roomConfig.occupancy })}
-                                        className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${roomConfig.occupancy === occ
-                                            ? 'bg-purple-600 text-white'
-                                            : isDisabled
-                                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                                : 'bg-white border border-purple-200 text-purple-700 hover:bg-purple-100'
+                                        disabled={!isAvailable}
+                                        onClick={() => {
+                                            const newMaxExtra = (selectedPriceGroup?.max_pax || 4) - num
+                                            setRoomConfig({
+                                                adults: num,
+                                                children: Math.min(roomConfig.children, newMaxExtra),
+                                                babies: Math.min(roomConfig.babies, Math.max(0, newMaxExtra - Math.min(roomConfig.children, newMaxExtra)))
+                                            })
+                                        }}
+                                        className={`p-3 rounded-lg text-center transition-all ${isSelected
+                                                ? 'bg-purple-600 text-white'
+                                                : isAvailable
+                                                    ? 'bg-white border border-purple-200 text-purple-700 hover:bg-purple-100'
+                                                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                                             }`}
                                     >
-                                        {occ.toUpperCase()}
-                                        {!isDisabled && (
-                                            <span className="block text-xs opacity-80">
-                                                {formatCurrency(occupancyPrice as number, selectedPriceGroup?.currency)}
+                                        <span className="block text-lg font-bold">{num}</span>
+                                        <span className="block text-xs opacity-80">{occupancy}</span>
+                                        {isAvailable && (
+                                            <span className="block text-xs mt-1">
+                                                {formatCurrency(price, selectedPriceGroup?.currency)}
                                             </span>
                                         )}
                                     </button>
                                 )
                             })}
                         </div>
+                        <p className="text-xs text-purple-500 mt-2">
+                            ℹ️ Yetişkin sayısına göre oda tipi ve fiyat otomatik belirlenir
+                        </p>
                     </div>
 
-                    {/* Kişi Sayıları */}
-                    <div className="grid grid-cols-3 gap-4">
+                    {/* Çocuk ve Bebek */}
+                    <div className="grid grid-cols-2 gap-4 p-3 bg-amber-50 rounded-lg border border-amber-200">
                         <div>
-                            <label className="block text-xs text-purple-700 mb-1">Yetişkin (Sabit)</label>
-                            <div className="w-full px-3 py-2 border border-purple-300 rounded-lg text-sm bg-purple-100 font-medium text-purple-800">
-                                {adults} kişi
-                            </div>
-                            <p className="text-xs text-purple-500 mt-1">
-                                {roomConfig.occupancy.toUpperCase()} odada {adults} yetişkin kalır
-                            </p>
-                        </div>
-                        <div>
-                            <label className="block text-xs text-purple-700 mb-1">Çocuk</label>
+                            <label className="block text-xs text-amber-700 mb-1">
+                                Çocuk (Max: {Math.max(0, maxExtraPersons - roomConfig.babies)})
+                            </label>
                             <input
                                 type="number"
                                 min="0"
-                                max="4"
+                                max={Math.max(0, maxExtraPersons - roomConfig.babies)}
                                 value={roomConfig.children}
-                                onChange={(e) => setRoomConfig({ ...roomConfig, children: parseInt(e.target.value) || 0 })}
-                                className="w-full px-3 py-2 border border-purple-200 rounded-lg text-sm"
+                                onChange={(e) => {
+                                    const val = Math.min(parseInt(e.target.value) || 0, Math.max(0, maxExtraPersons - roomConfig.babies))
+                                    setRoomConfig({ ...roomConfig, children: val })
+                                }}
+                                className="w-full px-3 py-2 border border-amber-200 rounded-lg text-sm bg-white"
                             />
                         </div>
                         <div>
-                            <label className="block text-xs text-purple-700 mb-1">Bebek</label>
+                            <label className="block text-xs text-amber-700 mb-1">
+                                Bebek (Max: {Math.max(0, maxExtraPersons - roomConfig.children)})
+                            </label>
                             <input
                                 type="number"
                                 min="0"
-                                max="2"
+                                max={Math.max(0, maxExtraPersons - roomConfig.children)}
                                 value={roomConfig.babies}
-                                onChange={(e) => setRoomConfig({ ...roomConfig, babies: parseInt(e.target.value) || 0 })}
-                                className="w-full px-3 py-2 border border-purple-200 rounded-lg text-sm"
+                                onChange={(e) => {
+                                    const val = Math.min(parseInt(e.target.value) || 0, Math.max(0, maxExtraPersons - roomConfig.children))
+                                    setRoomConfig({ ...roomConfig, babies: val })
+                                }}
+                                className="w-full px-3 py-2 border border-amber-200 rounded-lg text-sm bg-white"
                             />
+                        </div>
+                        <div className="col-span-2">
+                            <p className="text-xs text-amber-600">
+                                📌 Oda Kapasitesi: {maxPax} kişi | Kalan: {maxExtraPersons - roomConfig.children - roomConfig.babies} kişi
+                            </p>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Customer Section */}
+            {/* Müşteri */}
             <div className="space-y-3">
                 <div className="flex items-center justify-between">
                     <h4 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
@@ -373,7 +368,7 @@ export default function BookingForm({
                 )}
             </div>
 
-            {/* Passengers Section - Sadece Günübirlik için Detaylı */}
+            {/* Yolcular - Günübirlik için */}
             {pricingModel === 'per_person' && (
                 <div className="space-y-3">
                     <div className="flex items-center justify-between">
@@ -381,11 +376,7 @@ export default function BookingForm({
                             <Users className="w-4 h-4" />
                             Yolcular ({passengers.length} kişi)
                         </h4>
-                        <button
-                            type="button"
-                            onClick={addPassenger}
-                            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
-                        >
+                        <button type="button" onClick={addPassenger} className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800">
                             <Plus className="w-3 h-3" />
                             Yolcu Ekle
                         </button>
@@ -397,11 +388,7 @@ export default function BookingForm({
                                 <div className="flex items-center justify-between">
                                     <span className="text-xs font-medium text-gray-500">Yolcu {index + 1}</span>
                                     {passengers.length > 1 && (
-                                        <button
-                                            type="button"
-                                            onClick={() => removePassenger(passenger.tempId)}
-                                            className="text-gray-400 hover:text-red-600"
-                                        >
+                                        <button type="button" onClick={() => removePassenger(passenger.tempId)} className="text-gray-400 hover:text-red-600">
                                             <Trash2 className="w-3 h-3" />
                                         </button>
                                     )}
@@ -444,12 +431,10 @@ export default function BookingForm({
                 </div>
             )}
 
-            {/* Summary & Payment */}
+            {/* Özet & Ödeme */}
             <div className="grid grid-cols-2 gap-4">
                 <div className={`p-4 rounded-lg ${pricingModel === 'room_based' ? 'bg-purple-50' : 'bg-blue-50'}`}>
-                    <p className={`text-sm ${pricingModel === 'room_based' ? 'text-purple-700' : 'text-blue-700'}`}>
-                        Toplam Tutar
-                    </p>
+                    <p className={`text-sm ${pricingModel === 'room_based' ? 'text-purple-700' : 'text-blue-700'}`}>Toplam Tutar</p>
                     <p className={`text-2xl font-bold ${pricingModel === 'room_based' ? 'text-purple-800' : 'text-blue-800'}`}>
                         {formatCurrency(priceCalculation.total, priceCalculation.currency)}
                     </p>
@@ -467,17 +452,13 @@ export default function BookingForm({
                         onChange={(e) => setPaidAmount(parseFloat(e.target.value) || 0)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                     />
-                    <button
-                        type="button"
-                        onClick={() => setPaidAmount(priceCalculation.total)}
-                        className="text-xs text-blue-600 hover:text-blue-800 mt-1"
-                    >
+                    <button type="button" onClick={() => setPaidAmount(priceCalculation.total)} className="text-xs text-blue-600 hover:text-blue-800 mt-1">
                         Tam Ödeme
                     </button>
                 </div>
             </div>
 
-            {/* Notes */}
+            {/* Notlar */}
             <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Notlar</label>
                 <textarea
@@ -489,21 +470,15 @@ export default function BookingForm({
                 />
             </div>
 
-            {/* Actions */}
+            {/* Butonlar */}
             <div className="flex justify-end gap-3 pt-2 border-t">
-                <button
-                    type="button"
-                    onClick={onClose}
-                    className="px-4 py-2 text-sm text-gray-700 hover:text-gray-900"
-                >
+                <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-700 hover:text-gray-900">
                     İptal
                 </button>
                 <button
                     type="submit"
                     disabled={loading}
-                    className={`px-4 py-2 text-white rounded-lg text-sm disabled:opacity-50 ${pricingModel === 'room_based'
-                        ? 'bg-purple-600 hover:bg-purple-700'
-                        : 'bg-blue-600 hover:bg-blue-700'
+                    className={`px-4 py-2 text-white rounded-lg text-sm disabled:opacity-50 ${pricingModel === 'room_based' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'
                         }`}
                 >
                     {loading ? 'Kaydediliyor...' : 'Rezervasyon Oluştur'}
