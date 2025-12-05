@@ -1,29 +1,36 @@
 'use client'
 
 import { useState } from 'react'
-import { createPriceGroup } from '@/lib/actions/tour-details'
+import { createPriceGroup, updatePriceGroup, PriceGroup } from '@/lib/actions/tour-details'
 
 interface PriceGroupFormProps {
     tourId: string
     pricingModel: 'per_person' | 'room_based'
+    editData?: PriceGroup // Düzenleme modu için
     onClose: () => void
 }
 
 export default function PriceGroupForm({
     tourId,
     pricingModel,
+    editData,
     onClose
 }: PriceGroupFormProps) {
     const [loading, setLoading] = useState(false)
     const isRoomBased = pricingModel === 'room_based'
+    const isEditMode = !!editData
 
     async function handleSubmit(formData: FormData) {
         setLoading(true)
         try {
-            await createPriceGroup(tourId, formData, pricingModel)
+            if (isEditMode) {
+                await updatePriceGroup(editData.id, tourId, formData, pricingModel)
+            } else {
+                await createPriceGroup(tourId, formData, pricingModel)
+            }
             onClose()
         } catch (error) {
-            alert('Fiyat grubu oluşturulurken bir hata oluştu.')
+            alert(isEditMode ? 'Fiyat grubu güncellenirken bir hata oluştu.' : 'Fiyat grubu oluşturulurken bir hata oluştu.')
         } finally {
             setLoading(false)
         }
@@ -41,6 +48,7 @@ export default function PriceGroupForm({
                         type="text"
                         name="name"
                         required
+                        defaultValue={editData?.name || ''}
                         placeholder={isRoomBased ? 'Örn: Standart Oda' : 'Örn: 2024 Yaz Sezonu'}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                     />
@@ -49,6 +57,7 @@ export default function PriceGroupForm({
                     <label className="block text-sm font-medium text-gray-700 mb-1">Para Birimi</label>
                     <select
                         name="currency"
+                        defaultValue={editData?.currency || 'TRY'}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                     >
                         <option value="TRY">Türk Lirası (₺)</option>
@@ -73,7 +82,7 @@ export default function PriceGroupForm({
                                     name="max_pax"
                                     min="1"
                                     max="6"
-                                    defaultValue="4"
+                                    defaultValue={editData?.max_pax || 4}
                                     className="w-full px-3 py-2 border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-all bg-white"
                                 />
                             </div>
@@ -85,12 +94,14 @@ export default function PriceGroupForm({
                         <p className="text-sm font-medium text-gray-900 mb-3">Kişi Başı Fiyatlar (PP)</p>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                             <div>
-                                <label className="block text-xs text-gray-600 mb-1">Single PP</label>
+                                <label className="block text-xs text-gray-600 mb-1">Single PP *</label>
                                 <input
                                     type="number"
                                     name="price_single_pp"
                                     min="0"
                                     step="0.01"
+                                    required
+                                    defaultValue={editData?.price_single_pp || ''}
                                     placeholder="0"
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                                 />
@@ -103,6 +114,7 @@ export default function PriceGroupForm({
                                     name="price_double_pp"
                                     min="0"
                                     step="0.01"
+                                    defaultValue={editData?.price_double_pp || ''}
                                     placeholder="0"
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                                 />
@@ -115,6 +127,7 @@ export default function PriceGroupForm({
                                     name="price_triple_pp"
                                     min="0"
                                     step="0.01"
+                                    defaultValue={editData?.price_triple_pp || ''}
                                     placeholder="0"
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                                 />
@@ -127,6 +140,7 @@ export default function PriceGroupForm({
                                     name="price_quad_pp"
                                     min="0"
                                     step="0.01"
+                                    defaultValue={editData?.price_quad_pp || ''}
                                     placeholder="0"
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                                 />
@@ -146,6 +160,7 @@ export default function PriceGroupForm({
                                     name="price_child_1"
                                     min="0"
                                     step="0.01"
+                                    defaultValue={editData?.price_child_1 || ''}
                                     placeholder="0"
                                     className="w-full px-3 py-2 border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all bg-white"
                                 />
@@ -157,6 +172,7 @@ export default function PriceGroupForm({
                                     name="price_child_2"
                                     min="0"
                                     step="0.01"
+                                    defaultValue={editData?.price_child_2 || ''}
                                     placeholder="0"
                                     className="w-full px-3 py-2 border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all bg-white"
                                 />
@@ -168,7 +184,7 @@ export default function PriceGroupForm({
                                     name="price_baby_1"
                                     min="0"
                                     step="0.01"
-                                    defaultValue="0"
+                                    defaultValue={editData?.price_baby_1 || 0}
                                     className="w-full px-3 py-2 border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all bg-white"
                                 />
                             </div>
@@ -179,7 +195,7 @@ export default function PriceGroupForm({
                                     name="price_baby_2"
                                     min="0"
                                     step="0.01"
-                                    defaultValue="0"
+                                    defaultValue={editData?.price_baby_2 || 0}
                                     className="w-full px-3 py-2 border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all bg-white"
                                 />
                             </div>
@@ -200,6 +216,7 @@ export default function PriceGroupForm({
                             required
                             min="0"
                             step="0.01"
+                            defaultValue={editData?.price_adult || editData?.pricing?.adult || ''}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                         />
                     </div>
@@ -210,6 +227,7 @@ export default function PriceGroupForm({
                             name="price_child"
                             min="0"
                             step="0.01"
+                            defaultValue={editData?.price_child || editData?.pricing?.child || ''}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                         />
                     </div>
@@ -220,6 +238,7 @@ export default function PriceGroupForm({
                             name="price_baby"
                             min="0"
                             step="0.01"
+                            defaultValue={editData?.price_baby || editData?.pricing?.baby || ''}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                         />
                     </div>
@@ -239,7 +258,7 @@ export default function PriceGroupForm({
                     disabled={loading}
                     className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
                 >
-                    {loading ? 'Kaydediliyor...' : 'Kaydet'}
+                    {loading ? 'Kaydediliyor...' : isEditMode ? 'Güncelle' : 'Kaydet'}
                 </button>
             </div>
         </form>

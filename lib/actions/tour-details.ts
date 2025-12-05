@@ -147,6 +147,61 @@ export async function deletePriceGroup(id: string, tourId: string) {
     revalidatePath(`/dashboard/tours/${tourId}`)
 }
 
+export async function updatePriceGroup(id: string, tourId: string, formData: FormData, pricingModel: string = 'per_person') {
+    const supabase = await createClient()
+
+    const name = formData.get('name') as string
+    const currency = formData.get('currency') as string
+
+    let updateData: Record<string, unknown> = {
+        name,
+        currency
+    }
+
+    if (pricingModel === 'room_based') {
+        updateData = {
+            ...updateData,
+            max_pax: parseInt(formData.get('max_pax') as string) || 4,
+            price_single_pp: parseFloat(formData.get('price_single_pp') as string) || null,
+            price_double_pp: parseFloat(formData.get('price_double_pp') as string) || null,
+            price_triple_pp: parseFloat(formData.get('price_triple_pp') as string) || null,
+            price_quad_pp: parseFloat(formData.get('price_quad_pp') as string) || null,
+            price_child_1: parseFloat(formData.get('price_child_1') as string) || null,
+            price_child_2: parseFloat(formData.get('price_child_2') as string) || null,
+            price_baby_1: parseFloat(formData.get('price_baby_1') as string) || 0,
+            price_baby_2: parseFloat(formData.get('price_baby_2') as string) || 0,
+        }
+    } else {
+        const adultPrice = parseFloat(formData.get('price_adult') as string) || 0
+        const childPrice = parseFloat(formData.get('price_child') as string) || 0
+        const babyPrice = parseFloat(formData.get('price_baby') as string) || 0
+
+        updateData = {
+            ...updateData,
+            price_adult: adultPrice,
+            price_child: childPrice,
+            price_baby: babyPrice,
+            pricing: {
+                adult: adultPrice,
+                child: childPrice,
+                baby: babyPrice
+            }
+        }
+    }
+
+    const { error } = await supabase
+        .from('tour_price_groups')
+        .update(updateData)
+        .eq('id', id)
+
+    if (error) {
+        console.error('Fiyat grubu güncellenirken hata:', error)
+        throw new Error(`Fiyat grubu güncellenemedi: ${error.message}`)
+    }
+
+    revalidatePath(`/dashboard/tours/${tourId}`)
+}
+
 // --- Tour Dates Actions ---
 
 export async function getTourDates(tourId: string) {

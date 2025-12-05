@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Trash2, DollarSign, Home, Users } from 'lucide-react'
+import { Plus, Trash2, DollarSign, Home, Users, Pencil, X } from 'lucide-react'
 import { PriceGroup, deletePriceGroup } from '@/lib/actions/tour-details'
 import { Tour } from '@/lib/actions/tours'
 import { formatCurrency } from '@/lib/utils'
@@ -17,12 +17,22 @@ export default function PriceGroupList({
     priceGroups: PriceGroup[]
 }) {
     const [isFormOpen, setIsFormOpen] = useState(false)
+    const [editingPriceGroup, setEditingPriceGroup] = useState<PriceGroup | null>(null)
     const isPackageTour = tour.pricing_model === 'room_based'
 
     const handleDelete = async (id: string) => {
         if (confirm('Bu fiyat grubunu silmek istediğinize emin misiniz?')) {
             await deletePriceGroup(id, tourId)
         }
+    }
+
+    const handleEdit = (priceGroup: PriceGroup) => {
+        setEditingPriceGroup(priceGroup)
+        setIsFormOpen(false) // Yeni ekleme formunu kapat
+    }
+
+    const closeEditForm = () => {
+        setEditingPriceGroup(null)
     }
 
     return (
@@ -37,7 +47,10 @@ export default function PriceGroupList({
                     </p>
                 </div>
                 <button
-                    onClick={() => setIsFormOpen(true)}
+                    onClick={() => {
+                        setIsFormOpen(true)
+                        setEditingPriceGroup(null) // Düzenleme formunu kapat
+                    }}
                     className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
                 >
                     <Plus className="w-4 h-4" />
@@ -66,6 +79,7 @@ export default function PriceGroupList({
                 </div>
             </div>
 
+            {/* Yeni Ekleme Formu */}
             {isFormOpen && (
                 <div className="bg-gray-50 border border-gray-200 rounded-xl p-6">
                     <h4 className="text-sm font-semibold text-gray-900 mb-4">
@@ -75,6 +89,29 @@ export default function PriceGroupList({
                         tourId={tourId}
                         pricingModel={tour.pricing_model}
                         onClose={() => setIsFormOpen(false)}
+                    />
+                </div>
+            )}
+
+            {/* Düzenleme Formu */}
+            {editingPriceGroup && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-6">
+                    <div className="flex justify-between items-center mb-4">
+                        <h4 className="text-sm font-semibold text-amber-900">
+                            Düzenle: {editingPriceGroup.name}
+                        </h4>
+                        <button
+                            onClick={closeEditForm}
+                            className="p-1 text-amber-600 hover:text-amber-800 hover:bg-amber-100 rounded"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+                    <PriceGroupForm
+                        tourId={tourId}
+                        pricingModel={tour.pricing_model}
+                        editData={editingPriceGroup}
+                        onClose={closeEditForm}
                     />
                 </div>
             )}
@@ -98,25 +135,40 @@ export default function PriceGroupList({
                     </div>
                 ) : (
                     priceGroups.map((group) => (
-                        <div key={group.id} className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                        <div key={group.id} className={`bg-white border rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow ${editingPriceGroup?.id === group.id ? 'border-amber-400 ring-2 ring-amber-200' : 'border-gray-200'
+                            }`}>
                             <div className="flex justify-between items-start mb-4">
                                 <div>
                                     <h4 className="font-semibold text-gray-900">{group.name}</h4>
-                                    <span className="text-xs text-gray-500 uppercase">{group.currency}</span>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <span className="text-xs text-gray-500 uppercase">{group.currency}</span>
+                                        {group.max_pax && (
+                                            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
+                                                Max {group.max_pax} kişi
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
-                                <div className="flex gap-2">
+                                <div className="flex gap-1">
+                                    <button
+                                        onClick={() => handleEdit(group)}
+                                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                        title="Düzenle"
+                                    >
+                                        <Pencil className="w-4 h-4" />
+                                    </button>
                                     <button
                                         onClick={() => handleDelete(group.id)}
                                         className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                        title="Sil"
                                     >
                                         <Trash2 className="w-4 h-4" />
                                     </button>
                                 </div>
                             </div>
 
-                            {/* Fiyat Gösterimi - Model'e göre */}
+                            {/* Fiyat Gösterimi */}
                             {isPackageTour ? (
-                                // Paket Tur - Oda Bazlı
                                 <div className="space-y-2">
                                     {group.price_single_pp !== undefined && group.price_single_pp !== null && (
                                         <div className="flex justify-between items-center text-sm">
@@ -126,7 +178,7 @@ export default function PriceGroupList({
                                             </span>
                                         </div>
                                     )}
-                                    {group.price_double_pp !== undefined && group.price_double_pp !== null && (
+                                    {group.price_double_pp !== undefined && group.price_double_pp !== null && group.price_double_pp > 0 && (
                                         <div className="flex justify-between items-center text-sm">
                                             <span className="text-gray-600">Double PP</span>
                                             <span className="font-medium text-gray-900">
@@ -134,11 +186,19 @@ export default function PriceGroupList({
                                             </span>
                                         </div>
                                     )}
-                                    {group.price_triple_pp !== undefined && group.price_triple_pp !== null && (
+                                    {group.price_triple_pp !== undefined && group.price_triple_pp !== null && group.price_triple_pp > 0 && (
                                         <div className="flex justify-between items-center text-sm">
                                             <span className="text-gray-600">Triple PP</span>
                                             <span className="font-medium text-gray-900">
                                                 {formatCurrency(group.price_triple_pp, group.currency)}
+                                            </span>
+                                        </div>
+                                    )}
+                                    {group.price_quad_pp !== undefined && group.price_quad_pp !== null && group.price_quad_pp > 0 && (
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-gray-600">Quad PP</span>
+                                            <span className="font-medium text-gray-900">
+                                                {formatCurrency(group.price_quad_pp, group.currency)}
                                             </span>
                                         </div>
                                     )}
@@ -162,7 +222,6 @@ export default function PriceGroupList({
                                     </div>
                                 </div>
                             ) : (
-                                // Günübirlik Tur - Kişi Başı
                                 <div className="space-y-2">
                                     <div className="flex justify-between items-center text-sm">
                                         <span className="text-gray-600">Yetişkin</span>
