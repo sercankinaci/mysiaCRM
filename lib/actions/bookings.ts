@@ -325,14 +325,17 @@ export async function cancelBooking(bookingId: string) {
     // Restore capacity with direct query
     const { data: tourDate } = await supabase
         .from('tour_dates')
-        .select('capacity_available')
+        .select('capacity_available, capacity_total')
         .eq('id', booking.tour_date_id)
         .single()
 
     if (tourDate) {
+        // Kapasite iadesi yaparken toplam kapasiteyi aşmadığından emin ol
+        const newCapacity = Math.min(tourDate.capacity_total, tourDate.capacity_available + totalPax)
+
         await supabase
             .from('tour_dates')
-            .update({ capacity_available: tourDate.capacity_available + totalPax })
+            .update({ capacity_available: newCapacity })
             .eq('id', booking.tour_date_id)
     }
 
