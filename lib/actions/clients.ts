@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { normalizePhoneNumber } from '@/lib/utils'
+import { revalidatePath } from 'next/cache'
 
 export type Client = {
     id: string
@@ -114,4 +115,61 @@ export async function upsertClient(data: {
     }
 
     return newClient as Client
+}
+
+export async function getClients(page: number = 1, limit: number = 20, query: string = '') {
+    const supabase = await createClient()
+    const from = (page - 1) * limit
+    const to = from + limit - 1
+
+    let queryBuilder = supabase
+        .from('clients')
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range(from, to)
+
+    if (query) {
+        const searchTerm = query.trim()
+        const phoneQuery = normalizePhoneNumber(searchTerm)
+
+        if (phoneQuery) {
+            queryBuilder = queryBuilder.or(`name.ilike.%${searchTerm}%,phone.eq.${phoneQuery},phone.ilike.%${searchTerm}%`)
+        } else {
+            queryBuilder = queryBuilder.ilike('name', `%${searchTerm}%`)
+        }
+    }
+
+    const { data, error, count } = await queryBuilder
+
+    if (error) {
+        console.error('Müşteriler getirilirken hata:', error)
+        throw new Error('Müşteriler yüklenemedi')
+    }
+
+    return {
+        clients: data as Client[],
+        total: count || 0,
+        totalPages: Math.ceil((count || 0) / limit)
+    }
+}
+
+export async function deleteClient(id: string) {
+    const supabase = await createClient()
+
+    const { error } = await supabase
+        .from('clients')
+        .delete()
+        .eq('id', id)
+
+    if (error) {
+        console.error('Müşteri silinirken hata:', error)
+        // Eğer foreign key hatası ise kullanıcı dostu mesaj
+        if (error.code === '23503') {
+            throw new Error('Bu müşteriye ait rezervasyonlar olduğu için silinemez.')
+        }
+        throw new Error('Müşteri silinemedi')
+    }
+
+    revalidatePath('/dashboard/clients')
+    return { success: true }
 }
