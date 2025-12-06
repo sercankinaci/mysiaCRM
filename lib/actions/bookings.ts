@@ -264,21 +264,32 @@ export async function createBookingWithPassengers(data: {
         throw new Error(`Yolcular eklenemedi: ${passengersError.message}`)
     }
 
-    // 5. Update tour date capacity (TEMPORARILY DISABLED for debugging)
+    // 5. Update tour date capacity
     const totalPax = pax.adult + pax.child + pax.baby
-    console.log('Booking created, total pax:', totalPax)
-    // Capacity update temporarily disabled - will enable after fixing trigger/policy
-    /* await supabase
+
+    // Önce güncel kapasiteyi al
+    const { data: currentTourDate } = await supabase
         .from('tour_dates')
-        .update({
-            capacity_available: (await supabase
-                .from('tour_dates')
-                .select('capacity_available')
-                .eq('id', data.tour_date_id)
-                .single()
-            ).data?.capacity_available - totalPax
-        })
-        .eq('id', data.tour_date_id) */
+        .select('capacity_available')
+        .eq('id', data.tour_date_id)
+        .single()
+
+    if (currentTourDate) {
+        const newCapacity = Math.max(0, currentTourDate.capacity_available - totalPax)
+
+        const { error: capacityError } = await supabase
+            .from('tour_dates')
+            .update({
+                capacity_available: newCapacity
+            })
+            .eq('id', data.tour_date_id)
+
+        if (capacityError) {
+            console.error('Kapasite güncellenirken hata:', capacityError)
+            // Kritik bir hata değil, loglayıp devam edebiliriz veya kullanıcıyı uyarabiliriz.
+            // Ancak rezervasyon oluştuğu için işlemi kesmiyoruz.
+        }
+    }
 
     // 6. Add income if paid
     if (data.paid_amount > 0) {
