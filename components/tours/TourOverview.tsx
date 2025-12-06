@@ -1,7 +1,9 @@
 'use client'
 
+import Link from 'next/link'
 import { PriceGroup, TourDate } from '@/lib/actions/tour-details'
 import { Tour } from '@/lib/actions/tours'
+import { Booking } from '@/lib/actions/bookings'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import {
     Calendar,
@@ -12,16 +14,21 @@ import {
     DollarSign,
     CheckCircle,
     AlertCircle,
-    Ticket
+    Ticket,
+    FileText,
+    Phone,
+    ArrowRight,
+    User
 } from 'lucide-react'
 
 interface TourOverviewProps {
     tour: Tour
     priceGroups: PriceGroup[]
     tourDates: TourDate[]
+    recentBookings?: Booking[]
 }
 
-export default function TourOverview({ tour, priceGroups, tourDates }: TourOverviewProps) {
+export default function TourOverview({ tour, priceGroups, tourDates, recentBookings = [] }: TourOverviewProps) {
     // İstatistik hesaplamaları
     const totalCapacity = tourDates.reduce((sum, date) => sum + date.capacity_total, 0)
     const availableCapacity = tourDates.reduce((sum, date) => sum + date.capacity_available, 0)
@@ -29,7 +36,13 @@ export default function TourOverview({ tour, priceGroups, tourDates }: TourOverv
     const occupancyRate = totalCapacity > 0 ? Math.round((soldSeats / totalCapacity) * 100) : 0
 
     // Fiyat aralığı
-    const allPrices = priceGroups.flatMap(pg => [pg.pricing.adult, pg.pricing.child, pg.pricing.baby].filter(p => p > 0))
+    const allPrices = priceGroups.flatMap(pg => {
+        if (pg.pricing) {
+            return [pg.pricing.adult, pg.pricing.child, pg.pricing.baby].filter(p => p > 0)
+        }
+        // Oda bazlı fiyatlama
+        return [pg.price_single_pp, pg.price_double_pp, pg.price_triple_pp].filter(p => p && p > 0) as number[]
+    })
     const minPrice = allPrices.length > 0 ? Math.min(...allPrices) : 0
     const maxPrice = allPrices.length > 0 ? Math.max(...allPrices) : 0
 
@@ -41,6 +54,13 @@ export default function TourOverview({ tour, priceGroups, tourDates }: TourOverv
 
     // Sonraki tur tarihi
     const nextTourDate = upcomingDates[0]
+
+    // Durum konfigürasyonu
+    const statusConfig = {
+        confirmed: { label: 'Onaylı', color: 'bg-green-100 text-green-700', icon: CheckCircle },
+        pending: { label: 'Beklemede', color: 'bg-yellow-100 text-yellow-700', icon: Clock },
+        cancelled: { label: 'İptal', color: 'bg-red-100 text-red-700', icon: AlertCircle }
+    }
 
     return (
         <div className="space-y-6">
@@ -131,8 +151,8 @@ export default function TourOverview({ tour, priceGroups, tourDates }: TourOverv
                                 <label className="text-xs text-gray-500 uppercase tracking-wide">Tur Tipi</label>
                                 <p className="text-sm font-medium text-gray-900">
                                     <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs ${tour.tour_type === 'package'
-                                            ? 'bg-purple-100 text-purple-700'
-                                            : 'bg-blue-100 text-blue-700'
+                                        ? 'bg-purple-100 text-purple-700'
+                                        : 'bg-blue-100 text-blue-700'
                                         }`}>
                                         {tour.tour_type === 'package' ? '📦 Paket Tur' : '☀️ Günübirlik'}
                                     </span>
@@ -220,9 +240,10 @@ export default function TourOverview({ tour, priceGroups, tourDates }: TourOverv
                     {upcomingDates.length > 0 ? (
                         <div className="space-y-3">
                             {upcomingDates.map((date, index) => (
-                                <div
+                                <Link
                                     key={date.id}
-                                    className={`p-3 rounded-lg border ${index === 0 ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'
+                                    href={`/dashboard/tours/${tour.id}/dates/${date.id}`}
+                                    className={`block p-3 rounded-lg border hover:shadow-md transition-all ${index === 0 ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'
                                         }`}
                                 >
                                     <div className="flex items-center justify-between">
@@ -246,7 +267,7 @@ export default function TourOverview({ tour, priceGroups, tourDates }: TourOverv
                                     {date.price_group && (
                                         <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
                                             <DollarSign className="w-3 h-3" />
-                                            {date.price_group.name} - {formatCurrency(date.price_group.pricing.adult)}
+                                            {date.price_group.name}
                                         </p>
                                     )}
                                     {index === 0 && (
@@ -254,7 +275,7 @@ export default function TourOverview({ tour, priceGroups, tourDates }: TourOverv
                                             Sonraki Tur
                                         </span>
                                     )}
-                                </div>
+                                </Link>
                             ))}
                         </div>
                     ) : (
@@ -267,6 +288,106 @@ export default function TourOverview({ tour, priceGroups, tourDates }: TourOverv
                         </div>
                     )}
                 </div>
+            </div>
+
+            {/* Son Rezervasyonlar */}
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-indigo-500" />
+                    Son Rezervasyonlar
+                    {recentBookings.length > 0 && (
+                        <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full ml-2">
+                            {recentBookings.length} kayıt
+                        </span>
+                    )}
+                </h3>
+
+                {recentBookings.length > 0 ? (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="border-b border-gray-100">
+                                    <th className="text-left py-2 px-3 text-xs font-medium text-gray-500 uppercase">Müşteri</th>
+                                    <th className="text-left py-2 px-3 text-xs font-medium text-gray-500 uppercase">Tarih</th>
+                                    <th className="text-center py-2 px-3 text-xs font-medium text-gray-500 uppercase">Kişi</th>
+                                    <th className="text-right py-2 px-3 text-xs font-medium text-gray-500 uppercase">Tutar</th>
+                                    <th className="text-center py-2 px-3 text-xs font-medium text-gray-500 uppercase">Durum</th>
+                                    <th className="text-right py-2 px-3 text-xs font-medium text-gray-500 uppercase"></th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                                {recentBookings.map((booking) => {
+                                    const status = statusConfig[booking.booking_status] || statusConfig.pending
+                                    const StatusIcon = status.icon
+                                    const totalPax = booking.pax.adult + booking.pax.child + booking.pax.baby
+
+                                    return (
+                                        <tr key={booking.id} className="hover:bg-gray-50">
+                                            <td className="py-3 px-3">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                                                        <User className="w-4 h-4 text-gray-500" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-medium text-gray-900">
+                                                            {booking.client?.name || 'İsimsiz'}
+                                                        </p>
+                                                        {booking.client?.phone && (
+                                                            <p className="text-xs text-gray-500 flex items-center gap-1">
+                                                                <Phone className="w-3 h-3" />
+                                                                {booking.client.phone}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="py-3 px-3 text-gray-600">
+                                                {booking.tour_date?.start_date
+                                                    ? formatDate(booking.tour_date.start_date)
+                                                    : '-'
+                                                }
+                                            </td>
+                                            <td className="py-3 px-3 text-center">
+                                                <span className="inline-flex items-center gap-1 text-gray-700">
+                                                    <Users className="w-3 h-3" />
+                                                    {totalPax}
+                                                </span>
+                                            </td>
+                                            <td className="py-3 px-3 text-right font-medium text-gray-900">
+                                                {formatCurrency(booking.total_amount)}
+                                            </td>
+                                            <td className="py-3 px-3 text-center">
+                                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${status.color}`}>
+                                                    <StatusIcon className="w-3 h-3" />
+                                                    {status.label}
+                                                </span>
+                                            </td>
+                                            <td className="py-3 px-3 text-right">
+                                                {booking.tour_date && (
+                                                    <Link
+                                                        href={`/dashboard/tours/${tour.id}/dates/${booking.tour_date_id}`}
+                                                        className="text-indigo-600 hover:text-indigo-800 text-xs flex items-center gap-1 justify-end"
+                                                    >
+                                                        Detay
+                                                        <ArrowRight className="w-3 h-3" />
+                                                    </Link>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    )
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                ) : (
+                    <div className="text-center py-8">
+                        <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                        <p className="text-sm text-gray-500">Henüz rezervasyon bulunmuyor</p>
+                        <p className="text-xs text-gray-400 mt-1">
+                            Tur tarihlerinden rezervasyon ekleyebilirsiniz
+                        </p>
+                    </div>
+                )}
             </div>
 
             {/* Fiyat Grupları Özeti */}
@@ -296,18 +417,37 @@ export default function TourOverview({ tour, priceGroups, tourDates }: TourOverv
                                     </span>
                                 </div>
                                 <div className="space-y-1 text-sm">
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-500">Yetişkin</span>
-                                        <span className="font-medium">{formatCurrency(group.pricing.adult)} {group.currency}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-500">Çocuk</span>
-                                        <span className="font-medium">{formatCurrency(group.pricing.child)} {group.currency}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-500">Bebek</span>
-                                        <span className="font-medium">{formatCurrency(group.pricing.baby)} {group.currency}</span>
-                                    </div>
+                                    {group.pricing ? (
+                                        <>
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-500">Yetişkin</span>
+                                                <span className="font-medium">{formatCurrency(group.pricing.adult)} {group.currency}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-500">Çocuk</span>
+                                                <span className="font-medium">{formatCurrency(group.pricing.child)} {group.currency}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-500">Bebek</span>
+                                                <span className="font-medium">{formatCurrency(group.pricing.baby)} {group.currency}</span>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            {group.price_single_pp && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-500">Single PP</span>
+                                                    <span className="font-medium">{formatCurrency(group.price_single_pp)} {group.currency}</span>
+                                                </div>
+                                            )}
+                                            {group.price_double_pp && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-500">Double PP</span>
+                                                    <span className="font-medium">{formatCurrency(group.price_double_pp)} {group.currency}</span>
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         ))}

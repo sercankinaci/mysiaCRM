@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { ArrowLeft, Map } from 'lucide-react'
 import { getTourById } from '@/lib/actions/tours'
 import { getPriceGroups, getTourDates } from '@/lib/actions/tour-details'
+import { getRecentBookingsByTour } from '@/lib/actions/bookings'
 import { formatDate } from '@/lib/utils'
 import TourDetailTabs from '@/components/tours/TourDetailTabs'
 
@@ -25,6 +26,7 @@ export default async function TourDetailPage({
     // Fetch related data
     const priceGroups = await getPriceGroups(id)
     const tourDates = await getTourDates(id)
+    const recentBookings = await getRecentBookingsByTour(id, 10)
 
     return (
         <div className="space-y-6">
@@ -49,7 +51,7 @@ export default async function TourDetailPage({
                     <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
                         <span className="flex items-center gap-1">
                             <Map className="w-4 h-4" />
-                            {tour.tour_type}
+                            {tour.tour_type === 'daily' ? 'Günübirlik' : 'Paket Tur'}
                         </span>
                         <span>•</span>
                         <span>/{tour.slug}</span>
@@ -66,6 +68,7 @@ export default async function TourDetailPage({
                 activeTab={tab}
                 priceGroups={priceGroups}
                 tourDates={tourDates}
+                recentBookings={recentBookings}
             />
         </div>
     )

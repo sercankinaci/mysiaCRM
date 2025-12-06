@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { Booking } from '@/lib/actions/bookings'
 import { PriceGroup, TourDate } from '@/lib/actions/tour-details'
 import { Tour } from '@/lib/actions/tours'
 import PriceGroupList from './PriceGroupList'
@@ -20,13 +21,15 @@ export default function TourDetailTabs({
     tourId,
     activeTab,
     priceGroups,
-    tourDates
+    tourDates,
+    recentBookings = []
 }: {
     tour: Tour
     tourId: string
     activeTab: string
     priceGroups: PriceGroup[]
     tourDates: TourDate[]
+    recentBookings?: Booking[]
 }) {
     return (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm min-h-[400px]">
@@ -55,6 +58,7 @@ export default function TourDetailTabs({
                         tour={tour}
                         priceGroups={priceGroups}
                         tourDates={tourDates}
+                        recentBookings={recentBookings}
                     />
                 )}
 

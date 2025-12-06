@@ -78,6 +78,42 @@ export async function getBookingsByTourDate(tourDateId: string) {
     return data as Booking[]
 }
 
+export async function getRecentBookingsByTour(tourId: string, limit: number = 10) {
+    const supabase = await createClient()
+
+    // Önce turun tüm tarihlerini al
+    const { data: tourDates } = await supabase
+        .from('tour_dates')
+        .select('id')
+        .eq('tour_id', tourId)
+
+    if (!tourDates || tourDates.length === 0) {
+        return []
+    }
+
+    const tourDateIds = tourDates.map(td => td.id)
+
+    // Bu tarihlerdeki son rezervasyonları getir
+    const { data, error } = await supabase
+        .from('bookings')
+        .select(`
+            *,
+            client:clients(id, name, phone, email),
+            passengers:booking_passengers(*),
+            tour_date:tour_dates(start_date, end_date)
+        `)
+        .in('tour_date_id', tourDateIds)
+        .order('created_at', { ascending: false })
+        .limit(limit)
+
+    if (error) {
+        console.error('Tur rezervasyonları getirilirken hata:', error)
+        return []
+    }
+
+    return data as Booking[]
+}
+
 export async function getBookingById(id: string) {
     const supabase = await createClient()
 
