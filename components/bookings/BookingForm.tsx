@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Plus, Minus, ChevronRight, ChevronLeft, User, Users, Check, Home, Trash2, Copy, CreditCard, FileText } from 'lucide-react'
+import { Plus, Minus, ChevronRight, ChevronLeft, User, Users, Check, Home, Trash2, Copy, CreditCard, FileText, UserPlus } from 'lucide-react'
 import { createBookingWithPassengers, Passenger } from '@/lib/actions/bookings'
 import { PriceGroup } from '@/lib/actions/tour-details'
 import { formatCurrency } from '@/lib/utils'
@@ -50,26 +50,24 @@ export default function BookingForm({
     const [step, setStep] = useState(1)
     const [loading, setLoading] = useState(false)
 
-    // Odalar
+    // Odalar - Per person modunda sadece tek bir oda varmış gibi davranacağız
     const [rooms, setRooms] = useState<RoomConfig[]>([
         { id: '1', priceGroupId: priceGroups[0]?.id || '', adults: 1, children: 0, babies: 0 }
     ])
 
-    // Yolcu Bilgileri
     const [passengers, setPassengers] = useState<PassengerInfo[]>([])
-
-    // Müşteri
     const [isNewClient, setIsNewClient] = useState(true)
     const [clientId, setClientId] = useState('')
     const [newClient, setNewClient] = useState({ full_name: '', phone: '', email: '' })
-
-    // Ödeme
     const [paidAmount, setPaidAmount] = useState(0)
     const [notes, setNotes] = useState('')
 
     // --- Helpers ---
     const getMaxAdultsForPriceGroup = (priceGroup: PriceGroup | undefined) => {
         if (!priceGroup) return 1
+        // Per person modunda limit yok (sanal olarak 99 diyebiliriz çünkü oda mantığı yok)
+        if (pricingModel === 'per_person') return 99
+
         if (priceGroup.price_quad_pp && priceGroup.price_quad_pp > 0) return 4
         if (priceGroup.price_triple_pp && priceGroup.price_triple_pp > 0) return 3
         if (priceGroup.price_double_pp && priceGroup.price_double_pp > 0) return 2
@@ -92,12 +90,11 @@ export default function BookingForm({
                 case 3: adultPrice = priceGroup.price_triple_pp || 0; occupancy = 'TRPL'; break
                 case 4: adultPrice = priceGroup.price_quad_pp || 0; occupancy = 'QUAD'; break
             }
-
             if (room.adults > 0 && adultPrice > 0) {
                 breakdown.push({ label: `${room.adults} Yetişkin (${occupancy})`, amount: room.adults * adultPrice })
             }
 
-            // Çocuk/Bebek
+            // Konaklamalı çocuk fiyatları
             const child1Price = priceGroup.price_child_1 || 0
             const child2Price = priceGroup.price_child_2 || 0
             const baby1Price = priceGroup.price_baby_1 || 0
@@ -109,6 +106,7 @@ export default function BookingForm({
             if (room.babies >= 2) breakdown.push({ label: `${room.babies - 1} Bebek (2.+)`, amount: (room.babies - 1) * baby2Price })
 
         } else {
+            // Günübirlik tur fiyatları (Oda kavramı yok, düz çarpım)
             const adultPrice = priceGroup.price_adult || priceGroup.pricing?.adult || 0
             const childPrice = priceGroup.price_child || priceGroup.pricing?.child || 0
             const babyPrice = priceGroup.price_baby || priceGroup.pricing?.baby || 0
@@ -131,7 +129,8 @@ export default function BookingForm({
             const roomPrice = getRoomPrice(room)
             total += roomPrice.total
             currency = roomPrice.currency
-            if (rooms.length > 1) {
+            // Günübirlik modda sadece breakdown'ı ekle, oda başlığı atma
+            if (pricingModel === 'room_based' && rooms.length > 1) {
                 allBreakdown.push({ label: `Oda ${index + 1}`, amount: roomPrice.total })
             } else {
                 allBreakdown.push(...roomPrice.breakdown)
@@ -144,18 +143,28 @@ export default function BookingForm({
         setRooms(prev => prev.map(room => {
             if (room.id !== roomId) return room
             const priceGroup = priceGroups.find(pg => pg.id === room.priceGroupId)
-            const maxPax = priceGroup?.max_pax || 4
+
+            // Per person modunda limitleri gevşet
+            const isRoomBased = pricingModel === 'room_based'
+            const maxPax = isRoomBased ? (priceGroup?.max_pax || 4) : 99
             const maxAdults = getMaxAdultsForPriceGroup(priceGroup)
 
             if (field === 'adults') {
                 const newAdults = Math.max(1, Math.min(maxAdults, value as number))
-                const maxExtra = maxPax - newAdults
-                return { ...room, adults: newAdults, children: Math.min(room.children, maxExtra), babies: Math.min(room.babies, Math.max(0, maxExtra - Math.min(room.children, maxExtra))) }
+                // Per person modunda extra hesaplamasına gerek yok
+                const maxExtra = isRoomBased ? maxPax - newAdults : 99
+
+                return {
+                    ...room,
+                    adults: newAdults,
+                    children: Math.min(room.children, maxExtra),
+                    babies: Math.min(room.babies, Math.max(0, maxExtra - Math.min(room.children, maxExtra)))
+                }
             } else if (field === 'children') {
-                const maxChildren = maxPax - room.adults - room.babies
+                const maxChildren = isRoomBased ? maxPax - room.adults - room.babies : 99
                 return { ...room, children: Math.max(0, Math.min(maxChildren, value as number)) }
             } else if (field === 'babies') {
-                const maxBabies = maxPax - room.adults - room.children
+                const maxBabies = isRoomBased ? maxPax - room.adults - room.children : 99
                 return { ...room, babies: Math.max(0, Math.min(maxBabies, value as number)) }
             } else if (field === 'priceGroupId') {
                 const newPriceGroup = priceGroups.find(pg => pg.id === value)
@@ -217,33 +226,43 @@ export default function BookingForm({
 
     const RoomCard = ({ room, index }: { room: RoomConfig; index: number }) => {
         const priceGroup = priceGroups.find(pg => pg.id === room.priceGroupId)
-        const maxPax = priceGroup?.max_pax || 4
+        const isRoomBased = pricingModel === 'room_based'
+
+        const maxPax = isRoomBased ? (priceGroup?.max_pax || 4) : 99
         const maxAdults = getMaxAdultsForPriceGroup(priceGroup)
         const currentPax = room.adults + room.children + room.babies
-        const remainingPax = maxPax - currentPax
+        const remainingPax = isRoomBased ? (maxPax - currentPax) : 99
         const roomPrice = getRoomPrice(room)
 
         return (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow p-5">
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 font-bold text-sm">
-                            {index + 1}
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${isRoomBased ? 'bg-blue-50 text-blue-600' : 'bg-green-50 text-green-600'}`}>
+                            {isRoomBased ? index + 1 : <UserPlus className="w-5 h-5" />}
                         </div>
                         <div>
-                            <h4 className="font-semibold text-gray-900">{rooms.length > 1 ? `Oda ${index + 1}` : 'Oda Seçimi'}</h4>
-                            <p className="text-xs text-gray-500">Kapasite: {currentPax}/{maxPax} Kişi</p>
+                            <h4 className="font-semibold text-gray-900">
+                                {isRoomBased ? (rooms.length > 1 ? `Oda ${index + 1}` : 'Oda Seçimi') : 'Kişi Sayısı Seçimi'}
+                            </h4>
+                            <p className="text-xs text-gray-500">
+                                {isRoomBased ? `Kapasite: ${currentPax}/${maxPax} Kişi` : `${currentPax} Kişi Seçildi`}
+                            </p>
                         </div>
                     </div>
-                    <div className="flex gap-1">
-                        <button onClick={() => duplicateRoom(room)} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Kopyala"><Copy className="w-4 h-4" /></button>
-                        {rooms.length > 1 && <button onClick={() => removeRoom(room.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Sil"><Trash2 className="w-4 h-4" /></button>}
-                    </div>
+                    {isRoomBased && (
+                        <div className="flex gap-1">
+                            <button onClick={() => duplicateRoom(room)} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Kopyala"><Copy className="w-4 h-4" /></button>
+                            {rooms.length > 1 && <button onClick={() => removeRoom(room.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Sil"><Trash2 className="w-4 h-4" /></button>}
+                        </div>
+                    )}
                 </div>
 
                 {priceGroups.length > 1 && (
                     <div className="mb-4">
-                        <label className="block text-xs font-medium text-gray-700 mb-1.5">Oda Tipi</label>
+                        <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                            {isRoomBased ? 'Oda Tipi' : 'Fiyat Grubu'}
+                        </label>
                         <select
                             value={room.priceGroupId}
                             onChange={(e) => updateRoom(room.id, 'priceGroupId', e.target.value)}
@@ -266,7 +285,7 @@ export default function BookingForm({
                             <div className="flex items-center gap-3">
                                 <button onClick={() => updateRoom(room.id, item.field, item.val - 1)} disabled={item.val <= item.min} className="w-7 h-7 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-30"><Minus className="w-3 h-3" /></button>
                                 <span className="text-sm font-semibold w-2 text-center">{item.val}</span>
-                                <button onClick={() => updateRoom(room.id, item.field, item.val + 1)} disabled={item.val >= item.max} className="w-7 h-7 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-30"><Plus className="w-3 h-3" /></button>
+                                <button onClick={() => updateRoom(room.id, item.field, item.val + 1)} disabled={isRoomBased && item.val >= item.max} className="w-7 h-7 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-30"><Plus className="w-3 h-3" /></button>
                             </div>
                         </div>
                     ))}
@@ -282,7 +301,7 @@ export default function BookingForm({
                 <div className="flex items-center justify-between relative">
                     <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-gray-100 rounded-full -z-10" />
                     {[
-                        { id: 1, label: 'Oda Seçimi', icon: Home },
+                        { id: 1, label: pricingModel === 'room_based' ? 'Oda Seçimi' : 'Kişi Seçimi', icon: Home },
                         { id: 2, label: 'Yolcu Bilgileri', icon: Users },
                         { id: 3, label: 'Ödeme', icon: CreditCard }
                     ].map((s) => (
@@ -303,13 +322,19 @@ export default function BookingForm({
                         {rooms.map((room, index) => <RoomCard key={room.id} room={room} index={index} />)}
                     </div>
 
-                    <button onClick={addRoom} className="w-full py-3 border-2 border-dashed border-gray-200 rounded-xl text-gray-500 font-medium hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all flex items-center justify-center gap-2">
-                        <Plus className="w-5 h-5" /> Yeni Oda Ekle
-                    </button>
+                    {/* Sadece oda bazlı (konaklamalı) turlarda yeni oda eklenebilir */}
+                    {pricingModel === 'room_based' && (
+                        <button onClick={addRoom} className="w-full py-3 border-2 border-dashed border-gray-200 rounded-xl text-gray-500 font-medium hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all flex items-center justify-center gap-2">
+                            <Plus className="w-5 h-5" /> Yeni Oda Ekle
+                        </button>
+                    )}
 
                     <div className="sticky bottom-0 bg-white/80 backdrop-blur-md p-4 -mx-4 border-t border-gray-100 flex items-center justify-between rounded-xl shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
                         <div>
-                            <p className="text-sm text-gray-500">{totalPax} Kişi, {rooms.length} Oda</p>
+                            <p className="text-sm text-gray-500">
+                                {totalPax} Kişi
+                                {pricingModel === 'room_based' && `, ${rooms.length} Oda`}
+                            </p>
                             <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalPrice.total, totalPrice.currency)}</p>
                         </div>
                         <button onClick={proceedToStep2} className="px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all flex items-center gap-2">
@@ -330,7 +355,10 @@ export default function BookingForm({
                                     <div className="flex items-center justify-between">
                                         <h4 className="font-semibold text-gray-900 flex items-center gap-2">
                                             {passenger.passenger_type === 'adult' ? 'Yetişkin' : passenger.passenger_type === 'child' ? 'Çocuk' : 'Bebek'}
-                                            {rooms.length > 1 && <span className="text-xs font-normal text-gray-400 px-2 py-0.5 bg-gray-50 rounded-full">Oda {passenger.roomIndex + 1}</span>}
+                                            {/* Sadece oda bazlı ise oda numarasını göster */}
+                                            {pricingModel === 'room_based' && rooms.length > 1 && (
+                                                <span className="text-xs font-normal text-gray-400 px-2 py-0.5 bg-gray-50 rounded-full">Oda {passenger.roomIndex + 1}</span>
+                                            )}
                                         </h4>
                                         <span className="text-xs text-gray-400">Yolcu {index + 1}</span>
                                     </div>
@@ -351,7 +379,7 @@ export default function BookingForm({
                 </div>
             )}
 
-            {/* STEP 3 */}
+            {/* STEP 3 (Aynı kalacak) */}
             {step === 3 && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in slide-in-from-right-4 duration-300">
                     <div className="lg:col-span-2 space-y-6">
