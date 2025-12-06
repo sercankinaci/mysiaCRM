@@ -5,8 +5,10 @@ import { Plus, Minus, ChevronRight, ChevronLeft, User, Users, Check, Home, Trash
 import { createBookingWithPassengers, Passenger } from '@/lib/actions/bookings'
 import { getClientByPhone } from '@/lib/actions/clients'
 import { PriceGroup } from '@/lib/actions/tour-details'
-import { formatCurrency, formatPhoneNumberDisplay, normalizePhoneNumber } from '@/lib/utils'
+import { formatCurrency } from '@/lib/utils'
 import { useDebounce } from 'use-debounce'
+import PhoneInput, { isPossiblePhoneNumber } from 'react-phone-number-input'
+import 'react-phone-number-input/style.css'
 
 type PricingModel = 'per_person' | 'room_based'
 
@@ -52,12 +54,14 @@ export default function BookingForm({
     const [step, setStep] = useState(1)
     const [loading, setLoading] = useState(false)
 
-    // Odalar - Per person modunda sadece tek bir oda varmış gibi davranacağız
+    // Odalar
     const [rooms, setRooms] = useState<RoomConfig[]>([
         { id: '1', priceGroupId: priceGroups[0]?.id || '', adults: 1, children: 0, babies: 0 }
     ])
 
-    const [passengers, setPassengers] = useState<PassengerInfo[]>([])    // Müşteri
+    const [passengers, setPassengers] = useState<PassengerInfo[]>([])
+
+    // Müşteri
     const [isNewClient, setIsNewClient] = useState(true)
     const [clientId, setClientId] = useState('')
     const [newClient, setNewClient] = useState({ full_name: '', phone: '', email: '' })
@@ -70,23 +74,23 @@ export default function BookingForm({
     // Telefon değiştiğinde otomatik ara
     useEffect(() => {
         async function search() {
-            if (!isNewClient || !debouncedPhone || debouncedPhone.length < 10) return
+            // E.164 formatında en az +90... (yaklaşık 10-12 karakter) olmalı
+            if (!isNewClient || !debouncedPhone || debouncedPhone.length < 8) return
 
-            const normalized = normalizePhoneNumber(debouncedPhone)
-            if (!normalized) return
+            // Numara geçerli mi kontrol et (kütüphane fonksiyonu)
+            if (!isPossiblePhoneNumber(debouncedPhone)) return
 
             setIsSearchingClient(true)
             try {
-                const client = await getClientByPhone(normalized)
+                const client = await getClientByPhone(debouncedPhone)
                 if (client) {
                     setNewClient(prev => ({
                         ...prev,
                         full_name: client.name,
                         email: client.email || '',
-                        // Telefonu bozmuyoruz
+                        // Telefonu ellemiyoruz, input zaten yönetiyor
                     }))
                     setFoundClientMessage(`Kayıtlı müşteri bulundu: ${client.name}`)
-                    // Arka planda ID'yi de tutabiliriz ama upsert mantığı zaten halledecek
                 } else {
                     setFoundClientMessage(null)
                 }
@@ -98,15 +102,14 @@ export default function BookingForm({
         }
         search()
     }, [debouncedPhone, isNewClient])
+
     const [paidAmount, setPaidAmount] = useState(0)
     const [notes, setNotes] = useState('')
 
-    // --- Helpers ---
+    // --- Helpers (Fiyat hesaplama vb.) ---
     const getMaxAdultsForPriceGroup = (priceGroup: PriceGroup | undefined) => {
         if (!priceGroup) return 1
-        // Per person modunda limit yok (sanal olarak 99 diyebiliriz çünkü oda mantığı yok)
         if (pricingModel === 'per_person') return 99
-
         if (priceGroup.price_quad_pp && priceGroup.price_quad_pp > 0) return 4
         if (priceGroup.price_triple_pp && priceGroup.price_triple_pp > 0) return 3
         if (priceGroup.price_double_pp && priceGroup.price_double_pp > 0) return 2
@@ -132,8 +135,6 @@ export default function BookingForm({
             if (room.adults > 0 && adultPrice > 0) {
                 breakdown.push({ label: `${room.adults} Yetişkin (${occupancy})`, amount: room.adults * adultPrice })
             }
-
-            // Konaklamalı çocuk fiyatları
             const child1Price = priceGroup.price_child_1 || 0
             const child2Price = priceGroup.price_child_2 || 0
             const baby1Price = priceGroup.price_baby_1 || 0
@@ -143,9 +144,7 @@ export default function BookingForm({
             if (room.children >= 2) breakdown.push({ label: `${room.children - 1} Çocuk (2.+)`, amount: (room.children - 1) * child2Price })
             if (room.babies >= 1) breakdown.push({ label: '1. Bebek', amount: baby1Price })
             if (room.babies >= 2) breakdown.push({ label: `${room.babies - 1} Bebek (2.+)`, amount: (room.babies - 1) * baby2Price })
-
         } else {
-            // Günübirlik tur fiyatları (Oda kavramı yok, düz çarpım)
             const adultPrice = priceGroup.price_adult || priceGroup.pricing?.adult || 0
             const childPrice = priceGroup.price_child || priceGroup.pricing?.child || 0
             const babyPrice = priceGroup.price_baby || priceGroup.pricing?.baby || 0
@@ -168,7 +167,6 @@ export default function BookingForm({
             const roomPrice = getRoomPrice(room)
             total += roomPrice.total
             currency = roomPrice.currency
-            // Günübirlik modda sadece breakdown'ı ekle, oda başlığı atma
             if (pricingModel === 'room_based' && rooms.length > 1) {
                 allBreakdown.push({ label: `Oda ${index + 1}`, amount: roomPrice.total })
             } else {
@@ -182,17 +180,13 @@ export default function BookingForm({
         setRooms(prev => prev.map(room => {
             if (room.id !== roomId) return room
             const priceGroup = priceGroups.find(pg => pg.id === room.priceGroupId)
-
-            // Per person modunda limitleri gevşet
             const isRoomBased = pricingModel === 'room_based'
             const maxPax = isRoomBased ? (priceGroup?.max_pax || 4) : 99
             const maxAdults = getMaxAdultsForPriceGroup(priceGroup)
 
             if (field === 'adults') {
                 const newAdults = Math.max(1, Math.min(maxAdults, value as number))
-                // Per person modunda extra hesaplamasına gerek yok
                 const maxExtra = isRoomBased ? maxPax - newAdults : 99
-
                 return {
                     ...room,
                     adults: newAdults,
@@ -235,6 +229,12 @@ export default function BookingForm({
             alert('Müşteri adı gerekli')
             return
         }
+        // Telefon kontrolü
+        if (isNewClient && (!newClient.phone || !isPossiblePhoneNumber(newClient.phone))) {
+            alert('Lütfen geçerli bir telefon numarası girin')
+            return
+        }
+
         setLoading(true)
         try {
             const finalPassengers: Passenger[] = passengers.map(p => ({
@@ -335,6 +335,47 @@ export default function BookingForm({
 
     return (
         <div className="max-w-4xl mx-auto pb-8">
+            {/* Custom Styles for Phone Input */}
+            <style jsx global>{`
+                .PhoneInput {
+                    display: flex;
+                    align-items: center;
+                    background-color: #F9FAFB; /* bg-gray-50 */
+                    border: 1px solid #E5E7EB; /* border-gray-200 */
+                    border-radius: 0.75rem; /* rounded-xl */
+                    padding: 0.75rem 1rem; /* px-4 py-3 */
+                    transition: all 0.2s;
+                }
+                .PhoneInput:focus-within {
+                    background-color: #FFFFFF; /* bg-white */
+                    border-color: #3B82F6; /* border-blue-500 */
+                    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); /* ring-blue-50/50 approx */
+                }
+                .PhoneInput.success:focus-within {
+                    border-color: #22C55E; /* border-green-500 */
+                    box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.1); /* ring-green-50/50 approx */
+                }
+                .PhoneInputInput {
+                    flex: 1;
+                    min-width: 0;
+                    background-color: transparent;
+                    border: none;
+                    outline: none;
+                    font-size: 1rem;
+                    color: #111827; /* text-gray-900 */
+                }
+                .PhoneInputInput::placeholder {
+                    color: #9CA3AF; /* text-gray-400 */
+                }
+                .PhoneInputCountry {
+                    margin-right: 0.75rem; /* mr-3 */
+                    opacity: 0.7;
+                }
+                .PhoneInputCountrySelect {
+                    background-color: white;
+                }
+            `}</style>
+
             {/* Step Indicator */}
             <div className="mb-8">
                 <div className="flex items-center justify-between relative">
@@ -394,7 +435,6 @@ export default function BookingForm({
                                     <div className="flex items-center justify-between">
                                         <h4 className="font-semibold text-gray-900 flex items-center gap-2">
                                             {passenger.passenger_type === 'adult' ? 'Yetişkin' : passenger.passenger_type === 'child' ? 'Çocuk' : 'Bebek'}
-                                            {/* Sadece oda bazlı ise oda numarasını göster */}
                                             {pricingModel === 'room_based' && rooms.length > 1 && (
                                                 <span className="text-xs font-normal text-gray-400 px-2 py-0.5 bg-gray-50 rounded-full">Oda {passenger.roomIndex + 1}</span>
                                             )}
@@ -418,7 +458,7 @@ export default function BookingForm({
                 </div>
             )}
 
-            {/* STEP 3 (Aynı kalacak) */}
+            {/* STEP 3 */}
             {step === 3 && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in slide-in-from-right-4 duration-300">
                     <div className="lg:col-span-2 space-y-6">
@@ -442,18 +482,14 @@ export default function BookingForm({
                                     )}
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="relative">
-                                            <input
-                                                type="tel"
-                                                placeholder="Telefon (5XX)"
+                                            <PhoneInput
+                                                defaultCountry="TR"
+                                                placeholder="5XX XXX XX XX"
                                                 value={newClient.phone}
-                                                onChange={(e) => {
-                                                    // Sadece rakam girişine izin ver
-                                                    const val = e.target.value
-                                                    setNewClient({ ...newClient, phone: val })
-                                                }}
-                                                className={`w-full px-4 py-3 bg-gray-50 border rounded-xl focus:bg-white focus:ring-4 outline-none transition-all ${foundClientMessage ? 'border-green-300 focus:border-green-500 focus:ring-green-50/50' : 'border-gray-200 focus:border-blue-500 focus:ring-blue-50/50'}`}
+                                                onChange={(value: string) => setNewClient({ ...newClient, phone: value || '' })}
+                                                className={`PhoneInput ${foundClientMessage ? 'success' : ''}`}
                                             />
-                                            {isSearchingClient && <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />}
+                                            {isSearchingClient && <div className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />}
                                         </div>
                                         <input type="email" placeholder="E-posta" value={newClient.email} onChange={(e) => setNewClient({ ...newClient, email: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-50/50 outline-none transition-all" />
                                     </div>
