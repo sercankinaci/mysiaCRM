@@ -16,6 +16,7 @@ interface BookingFormProps {
     childAgeMax?: number
     babyAgeMax?: number
     onClose: () => void
+    onSuccess?: () => void
 }
 
 type RoomConfig = {
@@ -43,7 +44,8 @@ export default function BookingForm({
     childAgeMin = 3,
     childAgeMax = 11,
     babyAgeMax = 2,
-    onClose
+    onClose,
+    onSuccess
 }: BookingFormProps) {
     const [step, setStep] = useState(1)
     const [loading, setLoading] = useState(false)
@@ -256,7 +258,11 @@ export default function BookingForm({
                 paid_amount: paidAmount,
                 notes
             })
-            onClose()
+            if (onSuccess) {
+                onSuccess()
+            } else {
+                onClose()
+            }
         } catch (error) {
             alert('Rezervasyon oluşturulurken hata oluştu.')
         } finally {
@@ -484,14 +490,14 @@ export default function BookingForm({
                     <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
                         {passengers.map((passenger, index) => (
                             <div key={index} className={`p-4 rounded-lg border ${passenger.passenger_type === 'adult'
-                                    ? 'bg-blue-50 border-blue-200'
-                                    : passenger.passenger_type === 'child'
-                                        ? 'bg-green-50 border-green-200'
-                                        : 'bg-pink-50 border-pink-200'
+                                ? 'bg-blue-50 border-blue-200'
+                                : passenger.passenger_type === 'child'
+                                    ? 'bg-green-50 border-green-200'
+                                    : 'bg-pink-50 border-pink-200'
                                 }`}>
                                 <div className="flex items-center gap-2 mb-3">
                                     <User className={`w-4 h-4 ${passenger.passenger_type === 'adult' ? 'text-blue-600' :
-                                            passenger.passenger_type === 'child' ? 'text-green-600' : 'text-pink-600'
+                                        passenger.passenger_type === 'child' ? 'text-green-600' : 'text-pink-600'
                                         }`} />
                                     <span className="font-medium text-gray-900">
                                         {index + 1}. {passenger.passenger_type === 'adult' ? 'Yetişkin' :
