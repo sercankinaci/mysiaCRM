@@ -80,7 +80,8 @@ export default function TourSettings({ tour }: TourSettingsProps) {
                 setMessage({ type: 'error', text: result.error })
                 setShowDeleteConfirm(false)
             } else {
-                router.push('/dashboard/tours')
+                // Hard redirect to prevent stale page issues
+                window.location.href = '/dashboard/tours'
             }
         } catch (error) {
             setMessage({ type: 'error', text: 'Tur silinemedi.' })
@@ -94,8 +95,8 @@ export default function TourSettings({ tour }: TourSettingsProps) {
             {/* Mesaj */}
             {message && (
                 <div className={`p-4 rounded-lg ${message.type === 'success'
-                        ? 'bg-green-50 text-green-800 border border-green-200'
-                        : 'bg-red-50 text-red-800 border border-red-200'
+                    ? 'bg-green-50 text-green-800 border border-green-200'
+                    : 'bg-red-50 text-red-800 border border-red-200'
                     }`}>
                     {message.text}
                 </div>
@@ -123,29 +124,29 @@ export default function TourSettings({ tour }: TourSettingsProps) {
                                 onClick={() => handleStatusChange(option.value)}
                                 disabled={isUpdating || isSelected}
                                 className={`p-4 rounded-xl border-2 text-left transition-all ${isSelected
-                                        ? option.color === 'green'
-                                            ? 'border-green-500 bg-green-50'
-                                            : option.color === 'red'
-                                                ? 'border-red-500 bg-red-50'
-                                                : 'border-gray-500 bg-gray-50'
-                                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                                    ? option.color === 'green'
+                                        ? 'border-green-500 bg-green-50'
+                                        : option.color === 'red'
+                                            ? 'border-red-500 bg-red-50'
+                                            : 'border-gray-500 bg-gray-50'
+                                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                                     } ${isUpdating ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                             >
                                 <div className="flex items-center gap-3 mb-2">
                                     <div className={`w-10 h-10 rounded-full flex items-center justify-center ${option.color === 'green'
-                                            ? 'bg-green-100'
-                                            : option.color === 'red'
-                                                ? 'bg-red-100'
-                                                : 'bg-gray-100'
+                                        ? 'bg-green-100'
+                                        : option.color === 'red'
+                                            ? 'bg-red-100'
+                                            : 'bg-gray-100'
                                         }`}>
                                         {isUpdating && status !== option.value ? (
                                             <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
                                         ) : (
                                             <Icon className={`w-5 h-5 ${option.color === 'green'
-                                                    ? 'text-green-600'
-                                                    : option.color === 'red'
-                                                        ? 'text-red-600'
-                                                        : 'text-gray-600'
+                                                ? 'text-green-600'
+                                                : option.color === 'red'
+                                                    ? 'text-red-600'
+                                                    : 'text-gray-600'
                                                 }`} />
                                         )}
                                     </div>
