@@ -224,23 +224,22 @@ export async function getTourDates(tourId: string) {
     return data as TourDate[]
 }
 
-export async function createTourDate(tourId: string, formData: FormData) {
+export async function createTourDate(tourId: string, data: {
+    price_group_id: string
+    start_date: string
+    capacity: number
+}) {
     const supabase = await createClient()
-
-    const priceGroupId = formData.get('price_group_id') as string
-    const startDate = formData.get('start_date') as string
-    const endDate = formData.get('end_date') as string
-    const capacity = parseInt(formData.get('capacity') as string) || 45
 
     const { error } = await supabase
         .from('tour_dates')
         .insert({
             tour_id: tourId,
-            price_group_id: priceGroupId,
-            start_date: startDate,
-            end_date: endDate,
-            capacity_total: capacity,
-            capacity_available: capacity, // Başlangıçta hepsi boş
+            price_group_id: data.price_group_id,
+            start_date: data.start_date,
+            end_date: data.start_date, // Bitiş tarihi = Başlangıç tarihi (geriye uyumluluk)
+            capacity_total: data.capacity,
+            capacity_available: data.capacity,
             status: 'available'
         })
 
@@ -250,6 +249,36 @@ export async function createTourDate(tourId: string, formData: FormData) {
     }
 
     revalidatePath(`/dashboard/tours/${tourId}`)
+}
+
+export async function createBulkTourDates(tourId: string, data: {
+    price_group_id: string
+    dates: string[]
+    capacity: number
+}) {
+    const supabase = await createClient()
+
+    const datesToInsert = data.dates.map(date => ({
+        tour_id: tourId,
+        price_group_id: data.price_group_id,
+        start_date: date,
+        end_date: date,
+        capacity_total: data.capacity,
+        capacity_available: data.capacity,
+        status: 'available'
+    }))
+
+    const { error } = await supabase
+        .from('tour_dates')
+        .insert(datesToInsert)
+
+    if (error) {
+        console.error('Toplu tur tarihleri oluşturulurken hata:', error)
+        throw new Error('Tur tarihleri oluşturulamadı: ' + error.message)
+    }
+
+    revalidatePath(`/dashboard/tours/${tourId}`)
+    return { count: data.dates.length }
 }
 
 export async function deleteTourDate(id: string, tourId: string) {
