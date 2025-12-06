@@ -245,12 +245,25 @@ export default function BookingForm({
                 pickup_point: p.pickup_point,
                 passenger_type: p.passenger_type
             }))
+            // Fiyatlandırma stratejisi:
+            // Oda bazlı sistemde toplam fiyatı yetişkin sayısına bölerek 'sanal' bir yetişkin fiyatı oluşturuyoruz.
+            // Böylece backend (Yetişkin * Fiyat) + (Çocuk * 0) hesabı yaptığında Toplam Tutar, UI'daki ile birebir aynı çıkıyor.
+            const totalAdults = passengers.filter(p => p.passenger_type === 'adult').length
+
+            // Eğer yetişkin yoksa (çok nadir), toplam pax'a böl (fallback)
+            const divisor = totalAdults > 0 ? totalAdults : Math.max(1, totalPax)
+
             await createBookingWithPassengers({
                 tour_date_id: tourDateId,
                 client_id: isNewClient ? undefined : clientId,
                 new_client: isNewClient ? newClient : undefined,
                 passengers: finalPassengers,
-                pricing: { adult_price: totalPrice.total / Math.max(1, totalPax), child_price: 0, baby_price: 0, currency: totalPrice.currency },
+                pricing: {
+                    adult_price: totalPrice.total / divisor,
+                    child_price: 0,
+                    baby_price: 0,
+                    currency: totalPrice.currency
+                },
                 paid_amount: paidAmount,
                 notes
             })
@@ -486,7 +499,7 @@ export default function BookingForm({
                                                 defaultCountry="TR"
                                                 placeholder="5XX XXX XX XX"
                                                 value={newClient.phone}
-                                                onChange={(value: string) => setNewClient({ ...newClient, phone: value || '' })}
+                                                onChange={(value) => setNewClient({ ...newClient, phone: value || '' })}
                                                 className={`PhoneInput ${foundClientMessage ? 'success' : ''}`}
                                             />
                                             {isSearchingClient && <div className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />}
