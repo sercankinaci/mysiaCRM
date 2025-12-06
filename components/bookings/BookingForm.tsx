@@ -1,10 +1,12 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Plus, Minus, ChevronRight, ChevronLeft, User, Users, Check, Home, Trash2, Copy, CreditCard, FileText, UserPlus } from 'lucide-react'
 import { createBookingWithPassengers, Passenger } from '@/lib/actions/bookings'
+import { getClientByPhone } from '@/lib/actions/clients'
 import { PriceGroup } from '@/lib/actions/tour-details'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, formatPhoneNumberDisplay, normalizePhoneNumber } from '@/lib/utils'
+import { useDebounce } from 'use-debounce'
 
 type PricingModel = 'per_person' | 'room_based'
 
@@ -55,10 +57,47 @@ export default function BookingForm({
         { id: '1', priceGroupId: priceGroups[0]?.id || '', adults: 1, children: 0, babies: 0 }
     ])
 
-    const [passengers, setPassengers] = useState<PassengerInfo[]>([])
+    const [passengers, setPassengers] = useState<PassengerInfo[]>([])    // Müşteri
     const [isNewClient, setIsNewClient] = useState(true)
     const [clientId, setClientId] = useState('')
     const [newClient, setNewClient] = useState({ full_name: '', phone: '', email: '' })
+
+    // Telefon araması için debounce
+    const [debouncedPhone] = useDebounce(newClient.phone, 500)
+    const [isSearchingClient, setIsSearchingClient] = useState(false)
+    const [foundClientMessage, setFoundClientMessage] = useState<string | null>(null)
+
+    // Telefon değiştiğinde otomatik ara
+    useEffect(() => {
+        async function search() {
+            if (!isNewClient || !debouncedPhone || debouncedPhone.length < 10) return
+
+            const normalized = normalizePhoneNumber(debouncedPhone)
+            if (!normalized) return
+
+            setIsSearchingClient(true)
+            try {
+                const client = await getClientByPhone(normalized)
+                if (client) {
+                    setNewClient(prev => ({
+                        ...prev,
+                        full_name: client.name,
+                        email: client.email || '',
+                        // Telefonu bozmuyoruz
+                    }))
+                    setFoundClientMessage(`Kayıtlı müşteri bulundu: ${client.name}`)
+                    // Arka planda ID'yi de tutabiliriz ama upsert mantığı zaten halledecek
+                } else {
+                    setFoundClientMessage(null)
+                }
+            } catch (error) {
+                console.error(error)
+            } finally {
+                setIsSearchingClient(false)
+            }
+        }
+        search()
+    }, [debouncedPhone, isNewClient])
     const [paidAmount, setPaidAmount] = useState(0)
     const [notes, setNotes] = useState('')
 
@@ -396,8 +435,26 @@ export default function BookingForm({
                             {isNewClient ? (
                                 <div className="space-y-4">
                                     <input type="text" placeholder="Ad Soyad (Zorunlu)" value={newClient.full_name} onChange={(e) => setNewClient({ ...newClient, full_name: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-50/50 outline-none transition-all" />
+                                    {foundClientMessage && (
+                                        <div className="text-xs text-green-600 font-medium px-2 py-1 bg-green-50 rounded-lg flex items-center gap-1">
+                                            <Check className="w-3 h-3" /> {foundClientMessage}
+                                        </div>
+                                    )}
                                     <div className="grid grid-cols-2 gap-4">
-                                        <input type="tel" placeholder="Telefon" value={newClient.phone} onChange={(e) => setNewClient({ ...newClient, phone: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-50/50 outline-none transition-all" />
+                                        <div className="relative">
+                                            <input
+                                                type="tel"
+                                                placeholder="Telefon (5XX)"
+                                                value={newClient.phone}
+                                                onChange={(e) => {
+                                                    // Sadece rakam girişine izin ver
+                                                    const val = e.target.value
+                                                    setNewClient({ ...newClient, phone: val })
+                                                }}
+                                                className={`w-full px-4 py-3 bg-gray-50 border rounded-xl focus:bg-white focus:ring-4 outline-none transition-all ${foundClientMessage ? 'border-green-300 focus:border-green-500 focus:ring-green-50/50' : 'border-gray-200 focus:border-blue-500 focus:ring-blue-50/50'}`}
+                                            />
+                                            {isSearchingClient && <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />}
+                                        </div>
                                         <input type="email" placeholder="E-posta" value={newClient.email} onChange={(e) => setNewClient({ ...newClient, email: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-50/50 outline-none transition-all" />
                                     </div>
                                 </div>

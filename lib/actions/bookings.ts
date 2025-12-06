@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { addReservationIncome } from './operations'
+import { upsertClient } from './clients'
 
 // --- Types ---
 
@@ -142,31 +143,7 @@ export async function getBookingById(id: string) {
 
 // --- Create Client (inline) ---
 
-export async function createClient_inline(data: {
-    full_name: string
-    phone?: string
-    email?: string
-}) {
-    const supabase = await createClient()
 
-    const { data: client, error } = await supabase
-        .from('clients')
-        .insert({
-            name: data.full_name, // clients tablosunda kolon adı 'name'
-            phone: data.phone,
-            email: data.email,
-            source: 'reservation'
-        })
-        .select()
-        .single()
-
-    if (error) {
-        console.error('Müşteri oluşturulurken hata:', error)
-        throw new Error(`Müşteri oluşturulamadı: ${error.message}`)
-    }
-
-    return client
-}
 
 // --- Create Booking with Passengers ---
 
@@ -201,16 +178,29 @@ export async function createBookingWithPassengers(data: {
         throw new Error('Tur tarihi bulunamadı')
     }
 
-    // 1. Create client if new
+
+    // 1. Create or get client (UPSERT Logic)
     let clientId = data.client_id
+
+    // Eğer client_id yoksa ve yeni müşteri bilgisi geldiyse
     if (!clientId && data.new_client) {
-        const newClient = await createClient_inline(data.new_client)
-        clientId = newClient.id
+        if (!data.new_client.phone) {
+            throw new Error('Yeni müşteri için telefon numarası zorunludur')
+        }
+
+        // upsertClient, telefon numarasına göre var olanı bulur veya yeni oluşturur
+        const client = await upsertClient({
+            full_name: data.new_client.full_name,
+            phone: data.new_client.phone,
+            email: data.new_client.email
+        })
+        clientId = client.id
     }
 
     if (!clientId) {
         throw new Error('Müşteri bilgisi gerekli')
     }
+
 
     // 2. Calculate pax and total
     const pax = {
